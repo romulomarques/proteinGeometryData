@@ -1,6 +1,6 @@
 # FBS: a Frenquency-Based Search on Protein DDGP binary trees.
 
-Python notebook that generate the experiments in
+Python notebook that generates the experiments in
 
 A probabilistic search on the solution space of the Molecular Distance Geometry Problem,
 
