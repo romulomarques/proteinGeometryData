@@ -1,4 +1,4 @@
-# Sugestão: 
+# Sugestão:
 
 # 1. Teste com distâncias de poda exatas;
 # 2. Teste com distâncias de poda inexatas, onde podemos postergar a poda tomando intervalos maiores;
@@ -93,15 +93,15 @@ class DDGP:
         self.n = np.max(list(d.keys())) + 1
 
     def is_feasible(self, x, i, dtol=1e-4):
-        if i <= -1:
-            return False
         if i < 4:
             return True
         di = self.d[i]
-        for j in di.keys():
+        xi = x[i]
+        L = list(di.keys())
+        for j in L:
             if j < i:
                 dij = di[j]
-                dij_calc = norm(x[i] - x[j])
+                dij_calc = norm(xi - x[j])
                 if np.abs(dij - dij_calc) > dtol:
                     return False
             else:
@@ -189,7 +189,7 @@ class FBS(TreeSearch):
             raise Exception("No solution")
         self.T[self.TLvl] += 1
         val = self.states[self.T[self.TLvl]]
-        s_val = ''
+        s_val = ""
         for b in val:
             s_val = s_val + str(b)
         self.TVal = s_val
@@ -206,7 +206,7 @@ class FBS(TreeSearch):
                 self.TLvl += 1
                 self.T[self.TLvl] = 0
                 val = self.states[self.T[self.TLvl]]
-                s_val = ''
+                s_val = ""
                 for b in val:
                     s_val = s_val + str(b)
                 self.TVal = s_val
@@ -219,15 +219,15 @@ class FBS(TreeSearch):
 
 
 def bp(D: DDGP, TS: TreeSearch):
-    i = 3  # index of the last fixed point
+    i = 3  # index of the last fixed vertice
     is_feasible = True
     while True:
         i = TS.next(i, is_feasible)
         is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
             continue
-        if i == D.n:
-            print("Found a feasible solution:", TS.x)
+        if i == (D.n - 1):
+            print("Found a feasible solution.")
             return TS.x
 
 
@@ -437,7 +437,7 @@ class TesteDFS(unittest.TestCase):
             if dfs.T[i] == 0:
                 break
         Tsol[i] = 1
-        j = dfs.next(i, is_feasible)  
+        j = dfs.next(i, is_feasible)
         self.assertEqual(
             i,
             j,
@@ -455,7 +455,7 @@ class TesteDFS(unittest.TestCase):
         D, xsol = fake_DDGP(20)
         T = determineT(D, xsol)
 
-       # Testing if 'next' goes to the correct level of the BP tree.
+        # Testing if 'next' goes to the correct level of the BP tree.
         dfs = DFS(D)
         dfs.x = xsol
         dfs.T = T
@@ -551,19 +551,16 @@ class TesteDFS(unittest.TestCase):
         )
 
         # Testing if 'next' goes to the correct node of the BP tree.
-        self.assertTrue(np.all(np.array(dfs.T) == np.array(Tsol)), "Next failed: The successor vertex of the current vertex is not set to the FALSE child node OR another vertex has been set to the wrong node.",)
+        self.assertTrue(
+            np.all(np.array(dfs.T) == np.array(Tsol)),
+            "Next failed: The successor vertex of the current vertex is not set to the FALSE child node OR another vertex has been set to the wrong node.",
+        )
 
 
 class TestBP(unittest.TestCase):
     def test_bp_dfs(self):
         D, xsol = fake_DDGP(10)
         dfs = DFS(D)
-        print()
-        print('x')
-        print(dfs.x)
-        print()
-        print('xsol')
-        print(xsol)
         bpxsol = bp(D, dfs)
 
 
