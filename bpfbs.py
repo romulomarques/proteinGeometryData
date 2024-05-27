@@ -40,12 +40,12 @@ def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
     return proj_x, w
 
 
-def calc_x(self, i, b, x, D, debug=False):
+def calc_x(i, b, x, D, debug=False):
     ia, ib, ic = D.parents[i]
     da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
     A, B, C = x[ia], x[ib], x[ic]
     p, w = solveEQ3(A, B, C, da, db, dc)
-    x[i] = p + w if (b == 0) else p - w
+    x[i] = p + w if (b == 1) else p - w
 
     if debug:
         dax = norm(A - x[i])
@@ -56,7 +56,7 @@ def calc_x(self, i, b, x, D, debug=False):
         assert np.abs(dcx - dc) < 1e-4, "dcx=%g, dc=%g" % (dcx, dc)
 
 
-def init_x(self, D):
+def init_x(D):
     n = D.n
     x = np.zeros((n, 3), dtype=float)
 
@@ -77,7 +77,7 @@ def init_x(self, D):
     d13 = D.d[1][3]
     d23 = D.d[2][3]
     p, w = solveEQ3(x[0], x[1], x[2], d03, d13, d23)
-    x[3] = p - w
+    x[3] = p + w
     return x
 
 
@@ -94,14 +94,26 @@ class DDGP:
             return True
         di = self.d[i]
         for j in di.keys():
-            dij = di[j]
-            dij_calc = norm(x[i] - x[j])
-            if np.abs(dij - dij_calc) > dtol:
-                return False
+            if j < i:
+                dij = di[j]
+                dij_calc = norm(x[i] - x[j])
+                if np.abs(dij - dij_calc) > dtol:
+                    return False
+            else:
+                break
         return True
 
 
-class DFS:
+# Precisamos desta classe pai para alternarmos os métodos DFS e FBS no BP.
+class TreeSearch:
+    def __init__(self, D: DDGP):
+        self.x = init_x(D)
+
+    def next(self, i, is_feasible):
+        pass
+
+
+class DFS(TreeSearch):
     def __init__(self, D, last_node=1):
         self.D = D  # este atributo deve ser do tipo DDGP
         self.n = self.D.n
@@ -109,7 +121,6 @@ class DFS:
         self.T = np.zeros(self.n, dtype=int)
         self.T[:4] = last_node
         self.last_node = last_node
-        return self.T
 
     def backtracking(self, i):
         while self.T[i] == self.last_node:
@@ -130,14 +141,16 @@ class DFS:
         return i
 
 
-class FBS:
-    def ___init__(self, fn, D):
+class FBS(TreeSearch):
+    def ___init__(self, D, fn):
         self.states = []
         self.p = []  # probabilidade de cada estado
+        # self.iLength = []
         with open(fn, "r") as f:
             for line in f:
                 data = [x for x in line.split()]
                 p = float(data[0])
+                s = data[1:]
                 s = [int(x) for x in data[1:]]
                 if self.check_acceptance(p, s):
                     self.p.append(p)
@@ -151,6 +164,7 @@ class FBS:
         self.T = [0 for i in range(self.n)]
         self.TLvl = 0  # level of the current state
         self.TVal = ""  # state of the current node
+        # self.lengthState = 0 # length of the current binary state
 
     def check_acceptance(self, p, s):
         # ToDo Idealmente este método deve levar em consideração o
@@ -158,47 +172,58 @@ class FBS:
         return True
 
     def calc_x(self, i):
-        k = self.iX[self.TLvl] - i
-        b = self.TVal[k]
+        k = i - self.iX[self.TLvl - 1] - 1
+        b = int(self.TVal[k])
         calc_x(i, b, self.x, self.D)
 
     def backtracking(self):
         while self.T[self.TLvl] == self.last_node:
             self.T[self.TLvl] = 0
-            self.Tvl -= 1
+            self.TLvl -= 1
         if self.TLvl < 0:
             raise Exception("No solution")
         self.T[self.TLvl] += 1
-        self.TVal = self.states[self.T[self.TLvl]]
-        self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.TVal)
+        val = self.states[self.T[self.TLvl]]
+        s_val = ''
+        for b in val:
+            s_val = s_val + str(b)
+        self.TVal = s_val
+        # self.lengthState = self.iLength[]
+        # self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.TVal)
+        self.iX[self.TLvl] = self.iX[self.TLvl - 1] + 1
         return self.iX[self.TLvl]
 
     def next(self, i, is_feasible):
         if not is_feasible:
             i = self.backtracking()
         else:
-            self.TLvl += 1
-            self.T[self.TLvl] = 0
-            self.TVal = self.states[self.T[self.Tvl]]
-            self.iX[self.TLvl] = self.iX[self.Tvl - 1] + len(self.TVal)
+            if self.iX[self.TLvl] < self.iX[self.TLvl - 1] + len(self.TVal):
+                self.TLvl += 1
+                self.T[self.TLvl] = 0
+                val = self.states[self.T[self.TLvl]]
+                s_val = ''
+                for b in val:
+                    s_val = s_val + str(b)
+                self.TVal = s_val
+                # self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.TVal)
+                self.iX[self.TLvl] = self.iX[self.TLvl - 1] + 1
+            else:
+                self.iX[self.TLvl] = self.iX[self.TLvl] + 1
         self.calc_x(i)
         return i
 
 
-def bp(D, TreeSearch):
-    # Acho que nao precisa da linha abaixo, visto que o x jah eh inicializado na TreeSearch
-    # x = D.init_x()  # set the first four points
-    T = TreeSearch(D)
+def bp(D: DDGP, TS: TreeSearch):
     i = 3  # index of the last fixed point
     is_feasible = True
     while True:
-        i = T.next(i, is_feasible)
-        is_feasible = D.is_feasible(T.x, i)
+        i = TS.next(i, is_feasible)
+        is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
             continue
         if i == D.n:
-            print("Found a feasible solution:", x)
-            return x
+            print("Found a feasible solution:", TS.x)
+            return TS.x
 
 
 class TestSolveEQ3(unittest.TestCase):
@@ -235,6 +260,29 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
     xsol = np.random.rand(n, 3)
     parents = [[] for i in range(n)]
     d = {}
+
+    d01 = norm(xsol[1] - xsol[0])
+    d02 = norm(xsol[2] - xsol[0])
+    d12 = norm(xsol[2] - xsol[1])
+    d03 = norm(xsol[3] - xsol[0])
+    d13 = norm(xsol[3] - xsol[1])
+    d23 = norm(xsol[3] - xsol[2])
+
+    xsol[0], xsol[1], xsol[2], xsol[3] = [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]
+
+    # set x1
+    xsol[1][0] = d01
+
+    # set x2
+    cos_theta = (d02 * d02 + d01 * d01 - d12 * d12) / (2 * d01 * d02)
+    sin_theta = np.sqrt(1 - cos_theta * cos_theta)
+    xsol[2][0] = d02 * cos_theta
+    xsol[2][1] = d02 * sin_theta
+
+    # set x3
+    p, w = solveEQ3(xsol[0], xsol[1], xsol[2], d03, d13, d23)
+    xsol[3] = p + w
+
     for i in range(4):
         d[i] = {}
         for j in range(i, 4):
@@ -260,10 +308,10 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
     return DDGP(d, parents), xsol
 
 
-class TestDDGP(unittest.TestCase):
+class TestInitX(unittest.TestCase):
     def test_init_x(self):
         D, _ = fake_DDGP(7)
-        x = D.init_x()
+        x = init_x(D)
         self.assertAlmostEqual(norm(x[1] - x[0]), D.d[0][1], places=4)
         self.assertAlmostEqual(norm(x[2] - x[0]), D.d[0][2], places=4)
         self.assertAlmostEqual(norm(x[3] - x[0]), D.d[0][3], places=4)
@@ -271,6 +319,8 @@ class TestDDGP(unittest.TestCase):
         self.assertAlmostEqual(norm(x[3] - x[1]), D.d[1][3], places=4)
         self.assertAlmostEqual(norm(x[3] - x[2]), D.d[2][3], places=4)
 
+
+class TestDDGP(unittest.TestCase):
     def test_is_feasible(self):
         D, xsol = fake_DDGP(7)
         self.assertTrue(D.is_feasible(xsol, 6))
@@ -281,19 +331,19 @@ class TestDDGP(unittest.TestCase):
 
 
 def determineT(D, x, dtol=1e-4):
-    T = np.array([False] * len(x))
+    T = np.array([0] * len(x))
     for i in range(4):
-        T[i] = True
+        T[i] = 1
     for i in range(4, len(x)):
         ia, ib, ic = D.parents[i]
         da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
         A, B, C = x[ia], x[ib], x[ic]
         p, w = solveEQ3(A, B, C, da, db, dc)
         if norm(x[i] - (p - w)) < dtol:
-            T[i] = False
+            T[i] = 0
         else:
             if norm(x[i] - (p + w)) < dtol:
-                T[i] = True
+                T[i] = 1
             else:
                 print("Error creating T from x!")
                 exit(0)
@@ -301,7 +351,7 @@ def determineT(D, x, dtol=1e-4):
 
 
 class TesteDFS(unittest.TestCase):
-    def test_backtracking_1(self):
+    def test_backtracking_dfs_1(self):
         D, _ = fake_DDGP(100)
         dfs = DFS(D)
         Tsol = dfs.T.copy()
@@ -310,7 +360,7 @@ class TesteDFS(unittest.TestCase):
             np.random.choice(np.asarray(range(4, D.n)), 2, replace=False)
         )
         for i in range(start_bt, end_bt, -1):
-            dfs.T[i] = True
+            dfs.T[i] = 1
 
         i_bt = dfs.backtracking(start_bt)
         self.assertEqual(
@@ -323,7 +373,7 @@ class TesteDFS(unittest.TestCase):
             "Backtracking failed: The vertex between the current vertex and the backtracked vertex are not all set to the FALSE node.",
         )
 
-    def test_backtracking_2(self):
+    def test_backtracking_dfs_2(self):
         D, _ = fake_DDGP(100)
         dfs = DFS(D)
 
@@ -331,7 +381,7 @@ class TesteDFS(unittest.TestCase):
             np.random.choice(np.asarray(range(4, D.n)), 2, replace=False)
         )
 
-        dfs.T[end_bt + 1 : start_bt] = True
+        dfs.T[end_bt + 1 : start_bt] = 1
 
         Tsol = dfs.T.copy()
 
@@ -346,7 +396,7 @@ class TesteDFS(unittest.TestCase):
             "Backtracking failed: The current vertex has not been set to the TRUE node OR another vertex has been set to the wrong node.",
         )
 
-    def test_backtracking_3(self):
+    def test_backtracking_dfs_3(self):
         D, _ = fake_DDGP(7)
         dfs = DFS(D)
 
@@ -354,7 +404,7 @@ class TesteDFS(unittest.TestCase):
         dfs.T[5] = True
         dfs.T[6] = True
 
-        Tsol = np.array([False] * D.n)
+        Tsol = np.array([0] * D.n)
 
         i_bt = dfs.backtracking(D.n - 1)
         self.assertEqual(
@@ -368,40 +418,39 @@ class TesteDFS(unittest.TestCase):
         )
 
     # Current vertex is on the node FALSE and it is infeasible.
-    def test_next_1(self):
+    def test_next_dfs_1(self):
         D, xsol = fake_DDGP(20)
         T = determineT(D, xsol)
 
+        # Testing if 'next' goes to the correct level of the BP tree.
         dfs = DFS(D)
         dfs.x = xsol
         dfs.T = T
         Tsol = [dfs.T[i] for i in range(dfs.D.n)]
         is_feasible = False
         for i in range(4, dfs.D.n):
-            if dfs.T[i] == False:
+            if dfs.T[i] == 0:
                 break
-        Tsol[i] = True
-        j = dfs.next(i, is_feasible)
+        Tsol[i] = 1
+        j = dfs.next(i, is_feasible)  
         self.assertEqual(
             i,
             j,
-            "Next failed: It do not go to the brother node TRUE when the current vertex is on the node FALSE and it is infeasible!",
+            "Next failed: It do not stay on the current vertex when the current vertex is on the node FALSE and it is infeasible!",
         )
 
-        diff = np.array(dfs.T) == np.array(Tsol)
-        is_equal = True
-        for i in range(dfs.D.n):
-            is_equal = is_equal and diff[i]
+        # Testing if 'next' goes to the correct node of the BP tree.
         self.assertTrue(
-            is_equal,
+            np.all(np.array(dfs.T) == np.array(Tsol)),
             "Next failed: The current vertex has not been set to the TRUE node OR another vertex has been set to the wrong node.",
         )
 
     # Current vertex is on the node FALSE and it is feasible.
-    def test_next_2(self):
+    def test_next_dfs_2(self):
         D, xsol = fake_DDGP(20)
         T = determineT(D, xsol)
 
+       # Testing if 'next' goes to the correct level of the BP tree.
         dfs = DFS(D)
         dfs.x = xsol
         dfs.T = T
@@ -412,24 +461,20 @@ class TesteDFS(unittest.TestCase):
                 break
         Tsol[i + 1] = False
         j = dfs.next(i, is_feasible)
-
         self.assertEqual(
             i + 1,
             j,
-            "Next failed: It do not go to the child node FALSE when the current vertex is on the node False and it is feasible!",
+            "Next failed: It do not go to the successor vertex when the current vertex is on the node False and it is feasible!",
         )
 
-        diff = np.array(dfs.T) == np.array(Tsol)
-        is_equal = True
-        for i in range(dfs.D.n):
-            is_equal = is_equal and diff[i]
+        # Testing if 'next' goes to the correct node of the BP tree.
         self.assertTrue(
-            is_equal,
+            np.all(np.array(dfs.T) == np.array(Tsol)),
             "Next failed: The successor vertex of the current vertex is not set to the FALSE child node OR another vertex has been set to the wrong node.",
         )
 
     # Current vertex is on the node TRUE and it is infeasible.
-    def test_next_3(self):
+    def test_next_dfs_3(self):
         D, xsol = fake_DDGP(20)
         T = determineT(D, xsol)
 
@@ -437,19 +482,20 @@ class TesteDFS(unittest.TestCase):
         dfs.x = xsol.copy()
         dfs.T = T
         for i in range(4, dfs.D.n):
-            if dfs.T[i] == False and dfs.T[i + 1] == True:
+            if dfs.T[i] == 0 and dfs.T[i + 1] == 1:
                 break
         for j in range(i + 2, dfs.D.n):
-            if dfs.T[j] == False:
+            if dfs.T[j] == 0:
                 break
 
         Tsol = dfs.T.copy()
-        Tsol[i + 1 : j] = False
-        Tsol[i] = True
+        Tsol[i + 1 : j] = 0
+        Tsol[i] = 1
 
         is_feasible = False
         i_bt = dfs.next(j - 1, is_feasible)
 
+        # Testing if 'next' updates correctly the coordinates of the realized vertices.
         ia, ib, ic = dfs.D.parents[i]
         A, B, C = xsol[[ia, ib, ic]]
         da, db, dc = norm(A - dfs.x[i]), norm(B - dfs.x[i]), norm(C - dfs.x[i])
@@ -461,19 +507,21 @@ class TesteDFS(unittest.TestCase):
             "The current vertex is not on the TRUE node.",
         )
 
+        # Testing if 'next' goes to the correct level of the BP tree.
         self.assertEqual(
             i,
             i_bt,
-            "Next failed: It do not go to the first previous node FALSE when the current vertex is on the node TRUE and it is infeasible!",
+            "Next failed: It do not go to the first previous vertex set to FALSE when the current vertex is on the node TRUE and it is infeasible!",
         )
 
+        # Testing if 'next' goes to the correct node of the BP tree.
         self.assertTrue(
             np.all(np.array(dfs.T) == np.array(Tsol)),
-            "Next failed: The current vertex has not been set to the TRUE node OR another vertex has been set to the wrong node.",
+            "Next failed: A vertex between the current vertex and the first previous FALSE has not been set to FALSE, OR the first previous FALSE has not been set to TRUE, OR another vertex has been set to the wrong node.",
         )
 
     # Current vertex is on the node TRUE and it is feasible.
-    def test_next_4(self):
+    def test_next_dfs_4(self):
         D, xsol = fake_DDGP(20)
         T = determineT(D, xsol)
 
@@ -482,9 +530,11 @@ class TesteDFS(unittest.TestCase):
         dfs.T = T
         is_feasible = True
         for i in range(4, dfs.D.n):
-            if dfs.T[i] == True:
+            if dfs.T[i] == 1:
                 break
+        Tsol = dfs.T.copy()
         j = dfs.next(i, is_feasible)
+        Tsol[j] = 0
 
         if j == dfs.D.n - 1:
             raise ValueError("Reformulate the test!")
@@ -492,12 +542,24 @@ class TesteDFS(unittest.TestCase):
         self.assertEqual(
             i + 1,
             j,
-            "Next failed: It do not go to the child node FALSE when the current vertex is on the node True and it is feasible!",
+            "Next failed: It do not go to the successor vertex when the current vertex is on the node True and it is feasible!",
         )
 
-        self.assertFalse(dfs.T[j])
+        # Testing if 'next' goes to the correct node of the BP tree.
+        self.assertTrue(np.all(np.array(dfs.T) == np.array(Tsol)), "Next failed: The successor vertex of the current vertex is not set to the FALSE child node OR another vertex has been set to the wrong node.",)
 
-        # fazer os 4 casos: (False, infeasible); (False, feasible); (True, infeasible); (True, feasible)
+
+class TestBP(unittest.TestCase):
+    def test_bp_dfs(self):
+        D, xsol = fake_DDGP(10)
+        dfs = DFS(D)
+        print()
+        print('x')
+        print(dfs.x)
+        print()
+        print('xsol')
+        print(xsol)
+        bpxsol = bp(D, dfs)
 
 
 if __name__ == "__main__":
