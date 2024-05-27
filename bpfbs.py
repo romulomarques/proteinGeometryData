@@ -1,3 +1,8 @@
+# Sugestão: 
+
+# 1. Teste com distâncias de poda exatas;
+# 2. Teste com distâncias de poda inexatas, onde podemos postergar a poda tomando intervalos maiores;
+
 import numpy as np
 from numpy.linalg import norm, solve
 import unittest
