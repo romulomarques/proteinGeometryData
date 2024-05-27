@@ -31,12 +31,16 @@ def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
     B = [(da ** 2 - db ** 2 + A11 ** 2) / 2.0, (da ** 2 - dc ** 2 + A22 ** 2) / 2.0]
     y0, y1 = solve(A, B)
     s = da ** 2 - y0 ** 2 - y1 ** 2 - 2.0 * y0 * y1 * uv
-    if s < 0 and np.abs(s) < stol:
+    if s < 0 and np.abs(s) > stol:  # there is no solution
+        # print('solveEQ3:: there is no solution (s=%g)' % s)
+        # unfeasible solution
+        w = np.array([np.inf, 0, 0])
+        proj_x = np.zeros(3)
+        return proj_x, w
+    
+    if s < 0:
         # print('Warning: base is almost plane (s=%g)' % s)
         s = 0
-    if s < 0:  # there is no solution
-        # print('solveEQ3:: there is no solution (s=%g)' % s)
-        return False, None, None
 
     proj_x = a + y0 * u + y1 * v  # proj on the plane(a,b,c)
     y2 = np.sqrt(s)
@@ -91,6 +95,16 @@ class DDGP:
         self.d = d
         self.parents = parents
         self.n = np.max(list(d.keys())) + 1
+        self.triang_bounds = []
+        for i in range(self.n):
+            self.triang_bounds.append([])
+            for j, p in enumerate(self.parents):
+                if i not in p:
+                    continue
+                for k in p:
+                    if k >= i:
+                        continue
+                    self.triang_bounds[i].append((k, d[i][j] + d[k][j]))
 
     def is_feasible(self, x, i, dtol=1e-4):
         if i < 4:
@@ -98,6 +112,7 @@ class DDGP:
         di = self.d[i]
         xi = x[i]
         L = list(di.keys())
+        # feasibility with respect to antecessors
         for j in L:
             if j < i:
                 dij = di[j]
@@ -106,19 +121,16 @@ class DDGP:
                     return False
             else:
                 break
+        # feasibility with respect to triangular inequalities
+        for j, uij in self.triang_bounds[i]:
+            if j < i:
+                dij = norm(xi - x[j])
+                if dij > uij + dtol:
+                    return False
         return True
 
 
-# Precisamos desta classe pai para alternarmos os métodos DFS e FBS no BP.
-class TreeSearch:
-    def __init__(self, D: DDGP):
-        self.x = init_x(D)
-
-    def next(self, i, is_feasible):
-        pass
-
-
-class DFS(TreeSearch):
+class DFS:
     def __init__(self, D, last_node=1):
         self.D = D  # este atributo deve ser do tipo DDGP
         self.n = self.D.n
@@ -146,38 +158,29 @@ class DFS(TreeSearch):
         return i
 
 
-class FBS(TreeSearch):
-    def ___init__(self, D, fn):
-        self.states = []
-        self.p = []  # probabilidade de cada estado
-        # self.iLength = []
-        with open(fn, "r") as f:
-            for line in f:
-                data = [x for x in line.split()]
-                p = float(data[0])
-                s = data[1:]
-                s = [int(x) for x in data[1:]]
-                if self.check_acceptance(p, s):
-                    self.p.append(p)
-                    self.states.append(s)
-                # ToDo - verificar se o estado deve ser aceito
-        self.last_node = len(self.states) - 1
+class FBS:
+    def __init__(self, D, states, p):
         self.x = init_x(D)
+        self.states = states
+        self.p = p
+        self.filter_states()
+        self.last_node = len(self.states) - 1
         self.D = D
-        self.iX = []  # index of the last fixed point
         self.n = self.D.n
-        self.T = [0 for i in range(self.n)]
+        self.T = [0 for i in range(self.n)] # vector of states id
+        self.F = [0 for i in range(self.n)] # vector of flips
         self.TLvl = 0  # level of the current state
-        self.TVal = ""  # state of the current node
-        # self.lengthState = 0 # length of the current binary state
+        self.TVal = self.states[0]  # state of the current node
+        self.iX = np.zeros(self.n, dtype=int)  # index of the last fixed point
+        self.iX[0] = 4
 
-    def check_acceptance(self, p, s):
+    def filter_states(self):
         # ToDo Idealmente este método deve levar em consideração o
         # comprimento do estado 's' e a probabilidade 'p'
         return True
 
     def calc_x(self, i):
-        k = i - self.iX[self.TLvl - 1] - 1
+        k = i - self.iX[self.TLvl]
         b = int(self.TVal[k])
         calc_x(i, b, self.x, self.D)
 
@@ -188,37 +191,44 @@ class FBS(TreeSearch):
         if self.TLvl < 0:
             raise Exception("No solution")
         self.T[self.TLvl] += 1
-        val = self.states[self.T[self.TLvl]]
-        s_val = ""
-        for b in val:
-            s_val = s_val + str(b)
-        self.TVal = s_val
-        # self.lengthState = self.iLength[]
-        # self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.TVal)
-        self.iX[self.TLvl] = self.iX[self.TLvl - 1] + 1
+        s = self.states[self.T[self.TLvl]]
+        s = self.config_state(s)
+        self.TVal = s
+        k = self.T[self.TLvl - 1]
+        self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
         return self.iX[self.TLvl]
 
+    def config_state(self, s):
+        if self.TLvl == 0:
+            self.F[self.TLvl] = 1
+            s = [1 - x for x in s]
+        else:    
+            k = self.T[self.TLvl - 1]
+            f = self.F[self.TLvl - 1]
+            b = self.states[k][-1]
+            # (f == 1 and b == 0) or (f == 0 and b == 1)
+            if f + b == 1:
+                # flip s
+                s = [1 - x for x in s]
+                self.F[self.TLvl] = 1
+        return s
+
     def next(self, i, is_feasible):
+        i += 1
         if not is_feasible:
             i = self.backtracking()
-        else:
-            if self.iX[self.TLvl] < self.iX[self.TLvl - 1] + len(self.TVal):
-                self.TLvl += 1
-                self.T[self.TLvl] = 0
-                val = self.states[self.T[self.TLvl]]
-                s_val = ""
-                for b in val:
-                    s_val = s_val + str(b)
-                self.TVal = s_val
-                # self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.TVal)
-                self.iX[self.TLvl] = self.iX[self.TLvl - 1] + 1
-            else:
-                self.iX[self.TLvl] = self.iX[self.TLvl] + 1
+        elif i == self.iX[self.TLvl] + len(self.TVal):
+            self.TLvl += 1
+            self.T[self.TLvl] = 0
+            s = self.states[0]
+            s = self.config_state(s)
+            self.TVal = s
+            self.iX[self.TLvl] = i
         self.calc_x(i)
         return i
 
 
-def bp(D: DDGP, TS: TreeSearch):
+def bp(D: DDGP, TS):
     i = 3  # index of the last fixed vertice
     is_feasible = True
     while True:
@@ -310,6 +320,7 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
     for i in range(n):
         for j in d[i].keys():
             d[j][i] = d[i][j]
+
     return DDGP(d, parents), xsol
 
 
@@ -561,7 +572,14 @@ class TestBP(unittest.TestCase):
     def test_bp_dfs(self):
         D, xsol = fake_DDGP(10)
         dfs = DFS(D)
-        bpxsol = bp(D, dfs)
+        x = bp(D, dfs)
+
+    def test_bp_fbs(self):
+        D, xsol = fake_DDGP(10)
+        states = [(1, 1, 1), (0, 0, 0), (1, 1, 0), (1, 1), (1, 0), (0, 0), (0, 1)]
+        p = [0.7, 0.2, 0.1, 0.4, 0.3, 0.2, 0.1]
+        fbs = FBS(D, states, p)
+        x = bp(D, fbs)
 
 
 if __name__ == "__main__":
