@@ -590,10 +590,10 @@ class TesteDFS(unittest.TestCase):
 
 
 class TestBP(unittest.TestCase):
-    # def test_bp_dfs(self):
-    #     D, xsol = fake_DDGP(10)
-    #     dfs = DFS(D)
-    #     x = bp(D, dfs)
+    def test_bp_dfs(self):
+        D, xsol = fake_DDGP(10)
+        dfs = DFS(D)
+        x = bp(D, dfs)
 
     def test_bp_fbs(self):
         D, xsol = fake_DDGP(10)
