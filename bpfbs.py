@@ -98,13 +98,27 @@ class DDGP:
         self.triang_bounds = []
         for i in range(self.n):
             self.triang_bounds.append([])
-            for j, p in enumerate(self.parents):
+            for j, p in enumerate(self.parents[i+1:]):
+                child = j+i+1
                 if i not in p:
                     continue
                 for k in p:
                     if k >= i:
                         continue
-                    self.triang_bounds[i].append((k, d[i][j] + d[k][j]))
+                    uik = d[i][child] + d[k][child]
+                    if self.triang_bounds[i] == []:
+                        self.triang_bounds[i].append(([k, uik]))
+                    else:
+                        is_k = False
+                        for otherparent in self.triang_bounds[i]:
+                            if otherparent[0] == k:
+                                if otherparent[1] >= uik:
+                                    otherparent[1] = uik
+                                is_k = True
+                                break
+                        if not is_k:
+                            self.triang_bounds[i].append(([k, uik]))
+
 
     def is_feasible(self, x, i, dtol=1e-4):
         if i < 4:
@@ -122,11 +136,10 @@ class DDGP:
             else:
                 break
         # feasibility with respect to triangular inequalities
-        for j, uij in self.triang_bounds[i]:
-            if j < i:
-                dij = norm(xi - x[j])
-                if dij > uij + dtol:
-                    return False
+        for k, uik in self.triang_bounds[i]:
+            dik = norm(xi - x[k])
+            if dik >= uik + dtol:
+                return False
         return True
 
 
@@ -169,6 +182,7 @@ class FBS:
         self.n = self.D.n
         self.T = [0 for i in range(self.n)] # vector of states id
         self.F = [0 for i in range(self.n)] # vector of flips
+        self.F[0] = 1
         self.TLvl = 0  # level of the current state
         self.TVal = self.states[0]  # state of the current node
         self.iX = np.zeros(self.n, dtype=int)  # index of the last fixed point
@@ -187,6 +201,7 @@ class FBS:
     def backtracking(self):
         while self.T[self.TLvl] == self.last_node:
             self.T[self.TLvl] = 0
+            self.F[self.TLvl] = 0
             self.TLvl -= 1
         if self.TLvl < 0:
             raise Exception("No solution")
@@ -194,8 +209,9 @@ class FBS:
         s = self.states[self.T[self.TLvl]]
         s = self.config_state(s)
         self.TVal = s
-        k = self.T[self.TLvl - 1]
-        self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
+        if(self.TLvl > 0):
+            k = self.T[self.TLvl - 1]
+            self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
         return self.iX[self.TLvl]
 
     def config_state(self, s):
@@ -214,16 +230,21 @@ class FBS:
         return s
 
     def next(self, i, is_feasible):
-        i += 1
         if not is_feasible:
             i = self.backtracking()
-        elif i == self.iX[self.TLvl] + len(self.TVal):
-            self.TLvl += 1
-            self.T[self.TLvl] = 0
-            s = self.states[0]
+        else:
+            i += 1
+            if i == self.iX[self.TLvl] + len(self.TVal):
+                self.TLvl += 1
+                self.T[self.TLvl] = 0
+                s = self.states[0]
+                s = self.config_state(s)
+                self.TVal = s
+                self.iX[self.TLvl] = i
+        if (self.TLvl == 0) and (i == 4):
+            s = self.states[self.T[self.TLvl]]
             s = self.config_state(s)
             self.TVal = s
-            self.iX[self.TLvl] = i
         self.calc_x(i)
         return i
 
@@ -569,17 +590,28 @@ class TesteDFS(unittest.TestCase):
 
 
 class TestBP(unittest.TestCase):
-    def test_bp_dfs(self):
-        D, xsol = fake_DDGP(10)
-        dfs = DFS(D)
-        x = bp(D, dfs)
+    # def test_bp_dfs(self):
+    #     D, xsol = fake_DDGP(10)
+    #     dfs = DFS(D)
+    #     x = bp(D, dfs)
 
     def test_bp_fbs(self):
         D, xsol = fake_DDGP(10)
         states = [(1, 1, 1), (0, 0, 0), (1, 1, 0), (1, 1), (1, 0), (0, 0), (0, 1)]
         p = [0.7, 0.2, 0.1, 0.4, 0.3, 0.2, 0.1]
         fbs = FBS(D, states, p)
+        print('T de xsol:')
+        print(determineT(D, xsol))
+        print()
+        print('xsol:')
+        print(xsol)
         x = bp(D, fbs)
+        print('T do BP:')
+        print(determineT(D, x))
+        print()
+        print('x:')
+        print(x)
+
 
 
 if __name__ == "__main__":
