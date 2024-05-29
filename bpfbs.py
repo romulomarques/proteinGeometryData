@@ -37,7 +37,7 @@ def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
         w = np.array([np.inf, 0, 0])
         proj_x = np.zeros(3)
         return proj_x, w
-    
+
     if s < 0:
         # print('Warning: base is almost plane (s=%g)' % s)
         s = 0
@@ -96,29 +96,21 @@ class DDGP:
         self.parents = parents
         self.n = np.max(list(d.keys())) + 1
         self.triang_bounds = []
-        for i in range(self.n):
-            self.triang_bounds.append([])
-            for j, p in enumerate(self.parents[i+1:]):
-                child = j+i+1
-                if i not in p:
-                    continue
-                for k in p:
-                    if k >= i:
-                        continue
-                    uik = d[i][child] + d[k][child]
-                    if self.triang_bounds[i] == []:
-                        self.triang_bounds[i].append(([k, uik]))
-                    else:
-                        is_k = False
-                        for otherparent in self.triang_bounds[i]:
-                            if otherparent[0] == k:
-                                if otherparent[1] >= uik:
-                                    otherparent[1] = uik
-                                is_k = True
-                                break
-                        if not is_k:
-                            self.triang_bounds[i].append(([k, uik]))
 
+        # triangular inequalities
+        neighs = [set(d[i].keys()) for i in range(self.n)]
+        for i in range(self.n):
+            ui = {}
+            for j in range(0, i):
+                neighs_ij = neighs[i].intersection(neighs[j])
+                for k in neighs_ij:
+                    if k < i:
+                        continue
+                    sij = d[i][k] + d[j][k]
+                    uij = ui.get(j, np.inf)
+                    if sij < uij:
+                        ui[j] = sij
+            self.triang_bounds.append(list(ui.items()))
 
     def is_feasible(self, x, i, dtol=1e-4):
         if i < 4:
@@ -180,8 +172,8 @@ class FBS:
         self.last_node = len(self.states) - 1
         self.D = D
         self.n = self.D.n
-        self.T = [0 for i in range(self.n)] # vector of states id
-        self.F = [0 for i in range(self.n)] # vector of flips
+        self.T = [0 for i in range(self.n)]  # vector of states id
+        self.F = [0 for i in range(self.n)]  # vector of flips
         self.F[0] = 1
         self.TLvl = 0  # level of the current state
         self.TVal = self.states[0]  # state of the current node
@@ -209,7 +201,7 @@ class FBS:
         s = self.states[self.T[self.TLvl]]
         s = self.config_state(s)
         self.TVal = s
-        if(self.TLvl > 0):
+        if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
         return self.iX[self.TLvl]
@@ -218,7 +210,7 @@ class FBS:
         if self.TLvl == 0:
             self.F[self.TLvl] = 1
             s = [1 - x for x in s]
-        else:    
+        else:
             k = self.T[self.TLvl - 1]
             f = self.F[self.TLvl - 1]
             b = self.states[k][-1]
@@ -600,18 +592,7 @@ class TestBP(unittest.TestCase):
         states = [(1, 1, 1), (0, 0, 0), (1, 1, 0), (1, 1), (1, 0), (0, 0), (0, 1)]
         p = [0.7, 0.2, 0.1, 0.4, 0.3, 0.2, 0.1]
         fbs = FBS(D, states, p)
-        print('T de xsol:')
-        print(determineT(D, xsol))
-        print()
-        print('xsol:')
-        print(xsol)
         x = bp(D, fbs)
-        print('T do BP:')
-        print(determineT(D, x))
-        print()
-        print('x:')
-        print(x)
-
 
 
 if __name__ == "__main__":
