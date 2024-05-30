@@ -2,7 +2,7 @@ residue_number,residue_name,atom_number,atom_name,chain_id,x_coord,y_coord,z_coo
 84,ASN,1,N,A,-3.516,13.651,13.6
 84,ASN,2,CA,A,-4.315,12.423,13.715
 84,ASN,3,C,A,-4.406,11.741,12.366
-84,ASN,9,HA,A,-3.792,11.754,14.383
+84,ASN,12,HA,A,-3.792,11.754,14.383
 85,THR,17,N,A,-4.936,10.539,12.339
 85,THR,18,CA,A,-5.09,9.833,11.111
 85,THR,19,C,A,-6.471,10.135,10.53

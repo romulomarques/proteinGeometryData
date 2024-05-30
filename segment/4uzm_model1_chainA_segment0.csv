@@ -2,7 +2,7 @@ residue_number,residue_name,atom_number,atom_name,chain_id,x_coord,y_coord,z_coo
 36,ALA,1,N,A,4.906,-12.292,8.481
 36,ALA,2,CA,A,4.623,-12.046,7.042
 36,ALA,3,C,A,5.769,-11.289,6.381
-36,ALA,6,HA,A,4.508,-13.002,6.552
+36,ALA,9,HA,A,4.508,-13.002,6.552
 37,PHE,13,N,A,6.417,-10.419,7.149
 37,PHE,14,CA,A,7.533,-9.632,6.64
 37,PHE,15,C,A,8.862,-10.177,7.154
