@@ -3,20 +3,19 @@
 # 1. Teste com distâncias de poda exatas;
 # 2. Teste com distâncias de poda inexatas, onde podemos postergar a poda tomando intervalos maiores;
 
-import numpy as np
-from numpy.linalg import norm, solve
+import os
+import pickle
 import unittest
 import itertools
+import numpy as np
 import pandas as pd
+from numpy.linalg import norm, solve
 from sklearn.model_selection import train_test_split
-import os
 
 
-# wd = '/home/michael/gitrepos/proteinGeometryData'
-wd = 'C:/Users/romul/Documents/PythonProjects/proteinGeometryData'
+wd = '/home/michael/gitrepos/proteinGeometryData'
+# wd = 'C:/Users/romul/Documents/PythonProjects/proteinGeometryData'
 wd_binary = os.path.join(wd, 'binary')
-fbs_data_fn = 'df_count_slices.csv'
-
 
 def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
     u = b - a
@@ -638,10 +637,11 @@ if __name__ == "__main__":
     unittest.main()
     seed = 10
 
-    # It is assumed that the dataframe is decreasingly ordered by the size and the occurrency probability of the binary substrings
-    df = pd.read_csv(os.path.join(wd, fbs_data_fn))
-    percent_train = 0.8
-    pdb_train, pdb_test = train_test_split(df['pdb_code'].unique(), train_size=percent_train, random_state=seed)
+    fn = 'df_count_slices.pkl'
+    with open(os.path.join(wd, fn), 'rb') as f:
+        df = pickle.load(f)
+    
+    pdb_train, pdb_test = train_test_split(df['pdb_code'].unique(), train_size=0.8, random_state=seed)
     df_train = df[df['pdb_code'].isin(pdb_train)]
     states = list(df_train['b'])
     p = list(df_train['relfreq'])

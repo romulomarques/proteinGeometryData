@@ -4,3 +4,4 @@ pdb/**
 backbone/**
 binary/**
 original_sol/**
+*.pyc
