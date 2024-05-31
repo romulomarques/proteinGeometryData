@@ -7,6 +7,15 @@ import numpy as np
 from numpy.linalg import norm, solve
 import unittest
 import itertools
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import os
+
+
+# wd = '/home/michael/gitrepos/proteinGeometryData'
+wd = 'C:/Users/romul/Documents/PythonProjects/proteinGeometryData'
+wd_binary = os.path.join(wd, 'binary')
+fbs_data_fn = 'df_count_slices.csv'
 
 
 def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
@@ -207,10 +216,11 @@ class FBS:
         return self.iX[self.TLvl]
 
     def config_state(self, s):
-        if self.TLvl == 0:
-            self.F[self.TLvl] = 1
-            s = [1 - x for x in s]
-        else:
+        # if self.TLvl == 0:
+        #     self.F[self.TLvl] = 1
+        #     s = [1 - x for x in s]
+        # else:
+        if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             f = self.F[self.TLvl - 1]
             b = self.states[k][-1]
@@ -595,5 +605,44 @@ class TestBP(unittest.TestCase):
         x = bp(D, fbs)
 
 
+def train_test_pdb_binary_data(fn, percent_train=0.8, seed=10):
+    df = pd.read_csv(fn)
+    pdb_train, pdb_test = train_test_split(df['pdb_code'], train_size=percent_train, random_state=seed)
+
+
+def generateTests(pdb_test):
+    Tests = {'fn':[], 'n':[], 's':[], 'order': [], 'N_1': [], 'N_2': [], 'N_3': []}
+
+    for pdb_code in tqdm(os.listdir(wd_binary)):
+        pdb_code = os.path.join(wd_binary, pdb_code)
+        df = pd.read_csv(pdb_code)
+        # convert from b (binary) to s (string)
+        s = ''.join(df['b'].dropna().astype(int).astype(str))
+        s = s[1:] # remove b_4
+        order = ''.join(df['order'].astype(int).astype(str))
+        N_1 = ' '.join(df['N_1'].dropna().astype(int).astype(str))
+        N_2 = ' '.join(df['N_2'].dropna().astype(int).astype(str))
+        N_3 = ' '.join(df['N_3'].dropna().astype(int).astype(str))
+        M['fn'].append(pdb_code)
+        M['s'].append(s)
+        M['n'].append(len(s))
+        M['order'].append(order)
+        M['N_1'].append(N_1)
+        M['N_2'].append(N_2)
+        M['N_3'].append(N_3)
+
+    return Tests
+
+
 if __name__ == "__main__":
     unittest.main()
+    seed = 10
+
+    # It is assumed that the dataframe is decreasingly ordered by the size and the occurrency probability of the binary substrings
+    df = pd.read_csv(os.path.join(wd, fbs_data_fn))
+    percent_train = 0.8
+    pdb_train, pdb_test = train_test_split(df['pdb_code'].unique(), train_size=percent_train, random_state=seed)
+    df_train = df[df['pdb_code'].isin(pdb_train)]
+    states = list(df_train['b'])
+    p = list(df_train['relfreq'])
+    
