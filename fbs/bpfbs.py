@@ -322,7 +322,7 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
 
     for i in range(4):
         d[i] = {}
-        for j in range(i, 4):
+        for j in range(i+1, 4):
             d[i][j] = norm(xsol[i] - xsol[j])
 
     for i in range(4, n):
@@ -604,33 +604,28 @@ class TestBP(unittest.TestCase):
         x = bp(D, fbs)
 
 
-def train_test_pdb_binary_data(fn, percent_train=0.8, seed=10):
-    df = pd.read_csv(fn)
-    pdb_train, pdb_test = train_test_split(df['pdb_code'], train_size=percent_train, random_state=seed)
+# def generateTests(pdb_test):
+#     Tests = {'fn':[], 'n':[], 's':[], 'order': [], 'N_1': [], 'N_2': [], 'N_3': []}
 
+#     for pdb_code in tqdm(os.listdir(wd_binary)):
+#         pdb_code = os.path.join(wd_binary, pdb_code)
+#         df = pd.read_csv(pdb_code)
+#         # convert from b (binary) to s (string)
+#         s = ''.join(df['b'].dropna().astype(int).astype(str))
+#         s = s[1:] # remove b_4
+#         order = ''.join(df['order'].astype(int).astype(str))
+#         N_1 = ' '.join(df['N_1'].dropna().astype(int).astype(str))
+#         N_2 = ' '.join(df['N_2'].dropna().astype(int).astype(str))
+#         N_3 = ' '.join(df['N_3'].dropna().astype(int).astype(str))
+#         M['fn'].append(pdb_code)
+#         M['s'].append(s)
+#         M['n'].append(len(s))
+#         M['order'].append(order)
+#         M['N_1'].append(N_1)
+#         M['N_2'].append(N_2)
+#         M['N_3'].append(N_3)
 
-def generateTests(pdb_test):
-    Tests = {'fn':[], 'n':[], 's':[], 'order': [], 'N_1': [], 'N_2': [], 'N_3': []}
-
-    for pdb_code in tqdm(os.listdir(wd_binary)):
-        pdb_code = os.path.join(wd_binary, pdb_code)
-        df = pd.read_csv(pdb_code)
-        # convert from b (binary) to s (string)
-        s = ''.join(df['b'].dropna().astype(int).astype(str))
-        s = s[1:] # remove b_4
-        order = ''.join(df['order'].astype(int).astype(str))
-        N_1 = ' '.join(df['N_1'].dropna().astype(int).astype(str))
-        N_2 = ' '.join(df['N_2'].dropna().astype(int).astype(str))
-        N_3 = ' '.join(df['N_3'].dropna().astype(int).astype(str))
-        M['fn'].append(pdb_code)
-        M['s'].append(s)
-        M['n'].append(len(s))
-        M['order'].append(order)
-        M['N_1'].append(N_1)
-        M['N_2'].append(N_2)
-        M['N_3'].append(N_3)
-
-    return Tests
+#     return Tests
 
 
 if __name__ == "__main__":
