@@ -1,7 +1,10 @@
-df_total.tex
-pdb_entry_type.txt
 pdb/**
 backbone/**
 binary/**
 original_sol/**
 *.pyc
+df_total.tex
+pdb_entry_type.txt
+df_count_slices.csv
+pickled_binary
+pickled_original_sol
