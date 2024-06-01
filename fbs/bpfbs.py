@@ -6,9 +6,7 @@
 import os
 import pickle
 import unittest
-import itertools
 import numpy as np
-import pandas as pd
 from numpy.linalg import norm, solve
 from sklearn.model_selection import train_test_split
 
@@ -258,8 +256,7 @@ def bp(D: DDGP, TS):
         is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
             continue
-        if i == (D.n - 1):
-            print("Found a feasible solution.")
+        if i == (D.n - 1):            
             return TS.x
 
 
