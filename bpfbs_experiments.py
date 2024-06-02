@@ -23,8 +23,6 @@ def load_states():
 
     print(df['type'].groupby(df['type']).count())
 
-    exit()
-
     count_states_with_len_5 = sum([len(s) == 5 for s in states])
     if count_states_with_len_5 != 32:
         raise ValueError(f'Expected 32 states with length 5, got {count_states_with_len_5}')
