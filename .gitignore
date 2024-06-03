@@ -10,3 +10,6 @@ pickled_binary
 pickled_original_sol
 .venv/**
 ddgp/**
+bsol/**
+xsol/**
+

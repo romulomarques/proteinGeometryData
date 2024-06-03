@@ -58,6 +58,7 @@ def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
 def calc_x(i, b, x, D, debug=False):
     ia, ib, ic = D.parents[i]
     da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
+    da, db, dc = da.lower, db.lower, dc.lower
     A, B, C = x[ia], x[ib], x[ic]
     p, w = solveEQ3(A, B, C, da, db, dc)
     x[i] = p + w if (b == 1) else p - w
@@ -76,49 +77,58 @@ def init_x(D):
     x = np.zeros((n, 3), dtype=float)
 
     # set x1
-    d01 = D.d[0][1]
+    d01 = D.d[0][1].lower
     x[1][0] = d01
 
     # set x2
-    d02 = D.d[0][2]
-    d12 = D.d[1][2]
+    d02 = D.d[0][2].lower
+    d12 = D.d[1][2].lower
     cos_theta = (d02 * d02 + d01 * d01 - d12 * d12) / (2 * d01 * d02)
     sin_theta = np.sqrt(1 - cos_theta * cos_theta)
     x[2][0] = d02 * cos_theta
     x[2][1] = d02 * sin_theta
 
     # set x3
-    d03 = D.d[0][3]
-    d13 = D.d[1][3]
-    d23 = D.d[2][3]
+    d03 = D.d[0][3].lower
+    d13 = D.d[1][3].lower
+    d23 = D.d[2][3].lower
     p, w = solveEQ3(x[0], x[1], x[2], d03, d13, d23)
     x[3] = p + w
     return x
 
 
+class DistanceBounds:
+    def __init__(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+
+    def __str__(self):
+        return f"({self.lower}, {self.upper})"
+
 class DDGP:
     def __init__(self, d: dict, parents: list) -> None:
+        
         self.d = d
         self.parents = parents
         self.n = np.max(list(d.keys())) + 1
-        self.triang_bounds = []
 
+        # self.triang_bounds = []
         # triangular inequalities
-        neighs = [set(d[i].keys()) for i in range(self.n)]
-        for i in range(self.n):
-            ui = {}
-            for j in range(0, i):
-                neighs_ij = neighs[i].intersection(neighs[j])
-                for k in neighs_ij:
-                    if k < i:
-                        continue
-                    sij = d[i][k] + d[j][k]
-                    uij = ui.get(j, np.inf)
-                    if sij < uij:
-                        ui[j] = sij
-            self.triang_bounds.append(list(ui.items()))
+        # neighs = [set(d[i].keys()) for i in range(self.n)]
+        # for i in range(self.n):
+        #     ui = {}
+        #     for j in range(0, i):
+        #         neighs_ij = neighs[i].intersection(neighs[j])
+        #         for k in neighs_ij:
+        #             if k < i:
+        #                 continue
+        #             sij = d[i][k] + d[j][k]
+        #             uij = ui.get(j, np.inf)
+        #             if sij < uij:
+        #                 ui[j] = sij
+        #     self.triang_bounds.append(list(ui.items()))
 
-    def is_feasible(self, x, i, dtol=1e-4):
+    def is_feasible(self, x, i):
         if i < 4:
             return True
         di = self.d[i]
@@ -129,18 +139,20 @@ class DDGP:
             if j < i:
                 dij = di[j]
                 dij_calc = norm(xi - x[j])
-                if np.abs(dij - dij_calc) > dtol:
+                if not (dij.lower <= dij_calc <= dij.upper):
                     return False
             else:
                 break
+        
         # feasibility with respect to triangular inequalities
-        for k, uik in self.triang_bounds[i]:
-            dik = norm(xi - x[k])
-            if dik >= uik + dtol:
-                return False
+        # for k, uik in self.triang_bounds[i]:
+        #     dik = norm(xi - x[k])
+        #     if dik >= uik + dtol:
+        #         return False
+
         return True
     
-    def check_binary_solution(self, b, dtol=1e-4):
+    def check_bsol(self, b, dtol=1e-4):
         x = init_x(self)
         for i in range(4, self.n):
             x[i] = calc_x(i, b[i], x, self)
@@ -148,12 +160,11 @@ class DDGP:
                 return False
         return True
     
-    def check_coord_solution(self, x, dtol=1e-4):
+    def check_xsol(self, x, dtol=1e-4):
         for i in range(4, self.n):
             if not self.is_feasible(x, i, dtol):
                 return False
-        return True
-
+        return True    
 
 class DFS:
     def __init__(self, D, last_node=1):
@@ -182,6 +193,9 @@ class DFS:
         calc_x(i, self.T[i], self.x, self.D)
         return i
 
+    @property
+    def bsol(self):
+        return self.T
 
 class FBS:
     def __init__(self, D, states, p):
@@ -193,12 +207,15 @@ class FBS:
         self.D = D
         self.n = self.D.n
         self.T = [0 for i in range(self.n)]  # vector of states id
-        self.F = [0 for i in range(self.n)]  # vector of flips
-        self.F[0] = 1
+        self.F = [0 for i in range(self.n)]  # vector of flips        
         self.TLvl = 0  # level of the current state
         self.TVal = self.states[0]  # state of the current node
         self.iX = np.zeros(self.n, dtype=int)  # index of the last fixed point
         self.iX[0] = 4
+
+        # assert len(s) for s in states are descending
+        for i in range(1, len(states)):
+            assert len(states[i - 1]) >= len(states[i]), f"states are not descending: {states[i - 1]} < {states[i]}"
 
     def filter_states(self):
         # ToDo Idealmente este método deve levar em consideração o
@@ -227,18 +244,15 @@ class FBS:
         return self.iX[self.TLvl]
 
     def config_state(self, s):
-        # if self.TLvl == 0:
-        #     self.F[self.TLvl] = 1
-        #     s = [1 - x for x in s]
-        # else:
+        assert type(s) == str, f"state must be a string, got {type(s)}"
         if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             f = self.F[self.TLvl - 1]
-            b = int(self.states[k][-1])
-            # (f == 1 and b == 0) or (f == 0 and b == 1)
-            if f + b == 1:
+            b = int(self.states[k][-1])            
+            if (f == 1 and b == 1) or (f == 0 and b == 0):
                 # flip s
-                s = [1 - x for x in s]
+                s = [1 - int(x) for x in s]
+                s = ''.join([str(x) for x in s])
                 self.F[self.TLvl] = 1
         return s
 
@@ -261,8 +275,24 @@ class FBS:
         self.calc_x(i)
         return i
 
+    @property
+    def bsol(self, i:int=None):
+        if i is None:
+            i = self.n - 1
+            
+        b = "1111"
+        for lvl in range(self.TLvl):
+            s = self.states[self.T[lvl]]
+            if self.F[lvl] == 1:
+                s = [1 - int(x) for x in s]
+                s = ''.join([str(x) for x in s])
+            b += s
+        s = self.TVal[:(i - self.iX[self.TLvl] + 1)]
+        b += s 
+        return b
 
-def bp(D: DDGP, TS):
+
+def bp(D: DDGP, TS, verbose=False):
     i = 3  # index of the last fixed vertice
     is_feasible = True
     while True:
@@ -270,7 +300,10 @@ def bp(D: DDGP, TS):
         is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
             continue
-        if i == (D.n - 1):            
+        if i == (D.n - 1):
+            if verbose:
+                assert D.check_xsol(TS.x) == True
+                assert D.check_bsol(TS.bsol) == True
             return TS.x
 
 
@@ -615,67 +648,5 @@ class TestBP(unittest.TestCase):
         x = bp(D, fbs)
 
 
-# def generateTests(pdb_test):
-#     Tests = {'fn':[], 'n':[], 's':[], 'order': [], 'N_1': [], 'N_2': [], 'N_3': []}
-
-#     for pdb_code in tqdm(os.listdir(wd_binary)):
-#         pdb_code = os.path.join(wd_binary, pdb_code)
-#         df = pd.read_csv(pdb_code)
-#         # convert from b (binary) to s (string)
-#         s = ''.join(df['b'].dropna().astype(int).astype(str))
-#         s = s[1:] # remove b_4
-#         order = ''.join(df['order'].astype(int).astype(str))
-#         N_1 = ' '.join(df['N_1'].dropna().astype(int).astype(str))
-#         N_2 = ' '.join(df['N_2'].dropna().astype(int).astype(str))
-#         N_3 = ' '.join(df['N_3'].dropna().astype(int).astype(str))
-#         M['fn'].append(pdb_code)
-#         M['s'].append(s)
-#         M['n'].append(len(s))
-#         M['order'].append(order)
-#         M['N_1'].append(N_1)
-#         M['N_2'].append(N_2)
-#         M['N_3'].append(N_3)
-
-#     return Tests
-
-
-def load_states():
-    # Load 'states' and 'p' (relative frequencies)
-    fn_states = 'pickled_states.pkl'
-    with open(fn_states, 'rb') as f:
-        data = pickle.load(f)
-        states, p = data
-
-    df = {'states':[], 'p':[], 'type':[]}
-    for s, p_ in zip(states, p):
-        df['states'].append(s)
-        df['p'].append(p_)
-        # df['len'].append(len(s))
-        df['type'].append(type(s).__name__)
-    df = pd.DataFrame(df)
-
-    # check if all states are strings
-    if not all([type(s) == str for s in df['states']]):
-        raise ValueError('All states should be strings')
-
-    print(df['type'].groupby(df['type']).count())
-
-    count_states_with_len_5 = sum([len(s) == 5 for s in states])
-    if count_states_with_len_5 != 32:
-        raise ValueError(f'Expected 32 states with length 5, got {count_states_with_len_5}')
-    return states, p
-
 if __name__ == "__main__":
     unittest.main()
-    seed = 10
-
-    fn = 'df_count_slices.pkl'
-    with open(os.path.join(wd, fn), 'rb') as f:
-        df = pickle.load(f)
-    
-    pdb_train, pdb_test = train_test_split(df['pdb_code'].unique(), train_size=0.8, random_state=seed)
-    df_train = df[df['pdb_code'].isin(pdb_train)]
-    states = list(df_train['b'])
-    p = list(df_train['relfreq'])
-
-    

@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from fbs.bpfbs import FBS, DFS, DDGP, bp, load_states
+from fbs.algorithms import FBS, DFS, DDGP, bp
 
 
 def process_file(fn, n, states, p, verbose=False):
@@ -24,7 +24,7 @@ def process_file(fn, n, states, p, verbose=False):
 
     statistic = []
 
-    item = {"fn": fn, "n":n, "method": "dfs"}
+    item = {"fn": fn, "n": n, "method": "dfs"}
     try:
         tic = time.time()
         bp(D, dfs)
@@ -33,12 +33,13 @@ def process_file(fn, n, states, p, verbose=False):
     except:
         item["time_secs"] = None
     statistic.append(item)
+    print(item)
 
     # print statistics
     if verbose:
         print(f"DFS: {item['time_secs']:.2E} secs")
 
-    item = {"fn": fn, "n":n, "method": "fbs"}
+    item = {"fn": fn, "n": n, "method": "fbs"}
     try:
         tic = time.time()
         bp(D, fbs)
@@ -47,6 +48,8 @@ def process_file(fn, n, states, p, verbose=False):
     except:
         item["time_secs"] = None
     statistic.append(item)
+    print(item)
+    print()
 
     # print statistics
     if verbose:
@@ -55,7 +58,7 @@ def process_file(fn, n, states, p, verbose=False):
     return statistic
 
 
-def get_tests():
+def set_ddgp_bins():
     from tqdm import tqdm
 
     df = {"fn": [], "n": []}
@@ -77,86 +80,71 @@ def get_tests():
     return df
 
 
-def create_samples(ntests, df_tests):
+def ddgp_samples(ntests, df_tests):
     import random
+
     random.seed(42)
-    
+
     df_sample = []
-    for bin in df_tests['bin'].unique():
-        df_tests_bin = df_tests[df_tests['bin'] == bin]
+    for bin in df_tests["bin"].unique():
+        df_tests_bin = df_tests[df_tests["bin"] == bin]
         if len(df_tests_bin) < ntests:
             ntests = len(df_tests_bin)
         for _ in range(ntests):
             idx = random.choice(df_tests_bin.index)
             df_sample.append(df_tests_bin.loc[idx])
-    
+
     df_sample = pd.DataFrame(df_sample)
-    df_sample.sort_values(['bin','n'], inplace=True)
+    df_sample.sort_values(["bin", "n"], inplace=True)
     return df_sample
 
 
+def read_states():
+    df_slices = pd.read_csv("df_slices.csv")
+    df_slices.sort_values(["size", "count"], ascending=[False, False], inplace=True)
+
+    df_slices = df_slices[df_slices["size"] <= 5]
+
+    states = df_slices["bsol"].to_list()
+    p = df_slices["relfreq"].to_list()
+
+    num_size_5 = sum(df_slices["size"] == 5)
+    assert num_size_5 == 32, f"Expected 1 size 5, got {num_size_5}"
+
+    return states, p
+
+
+def test_instance():
+    states, p = read_states()
+
+    fn = '2d9t_model1_chainA_segment0_ddgp.pkl'
+    fn_bsol = os.path.join('bsol', fn + '_binary.csv')
+    fn_ddgp = os.path.join('ddgp', fn + '_ddgp.pkl')    
+    
+    bsol = pd.read_csv(fn_bsol)
+    b = bsol['b'].fillna(1).astype(int).to_numpy()
+    
+    with open(fn_ddgp, 'rb') as f:
+        D = pickle.load(f)
+    
+    fbs = FBS(D, states, p)
+    bp(D, fbs, verbose=True)
+
 def main():
+    states, p = read_states()
 
-    # set random seed
+    df_ddgp_bins = set_ddgp_bins()
 
-    states, p = load_states()
-
-    df_tests = get_tests()
-
-    df_sample = create_samples(5, df_tests)
+    df_ddgp_sample = ddgp_samples(5, df_ddgp_bins)
 
     statistic = []
-    for _, row in tqdm(list(df_sample.iterrows())):        
-        statistic.extend(process_file(row['fn'], row['n'], states, p))
+    for _, row in tqdm(list(df_ddgp_sample.iterrows())):
+        statistic.extend(process_file(row["fn"], row["n"], states, p))
 
     df_statistic = pd.DataFrame(statistic)
     df_statistic.to_csv("df_statistic.csv", index=False)
 
 
-def test_instance():
-
-    import fbs
-    import time
-    import pickle
-    import numpy as np
-    import pandas as pd
-
-    fn_ddgp = "ddgp/1nm4_model1_chainA_segment0_ddgp.pkl"
-    with open(fn_ddgp, "rb") as f:
-        D:DDGP = pickle.load(f)
-
-    fn_sol = "original_sol/" + os.path.basename(fn_ddgp).replace('_ddgp.pkl', '.sol')
-    xsol = np.loadtxt(fn_sol)
-    
-    fn_bin = "binary/" + os.path.basename(fn_ddgp).replace('_ddgp.pkl', '_binary.csv')
-    xbin = pd.read_csv(fn_bin)
-    xbin['b'] = xbin['b'].fillna(1)
-    xbin['b'] = xbin['b'].astype(int)
-
-    # permute the solution
-    xsol = xsol[xbin['order']]
-    assert D.check_coord_solution(xsol)
-
-    assert D.check_binary_solution(xbin['b'].values)
-    
-    print(f"xbin: {xbin['b'].tolist()}")
-
-    states, p = load_states()
-
-    fbs = FBS(D, states, p)
-    dfs = DFS(D)
-
-    tic = time.time()
-    x = bp(D, dfs)
-    toc = time.time() - tic
-    print(f"DFS: {toc:.2E} secs")
-
-    tic = time.time()
-    x = bp(D, fbs)
-    toc = time.time() - tic
-    print(f"FBS: {toc:.2E} secs")
-
-
 if __name__ == "__main__":
-    # main()
-    test_instance()
+    # test_instance()
+    main()
