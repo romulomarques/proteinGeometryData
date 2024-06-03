@@ -7,8 +7,8 @@ import os
 import pickle
 import unittest
 import numpy as np
+import pandas as pd
 from numpy.linalg import norm, solve
-from sklearn.model_selection import train_test_split
 
 
 wd = '/home/michael/gitrepos/proteinGeometryData'
@@ -139,6 +139,20 @@ class DDGP:
             if dik >= uik + dtol:
                 return False
         return True
+    
+    def check_binary_solution(self, b, dtol=1e-4):
+        x = init_x(self)
+        for i in range(4, self.n):
+            x[i] = calc_x(i, b[i], x, self)
+            if not self.is_feasible(x, i, dtol):
+                return False
+        return True
+    
+    def check_coord_solution(self, x, dtol=1e-4):
+        for i in range(4, self.n):
+            if not self.is_feasible(x, i, dtol):
+                return False
+        return True
 
 
 class DFS:
@@ -220,7 +234,7 @@ class FBS:
         if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             f = self.F[self.TLvl - 1]
-            b = self.states[k][-1]
+            b = int(self.states[k][-1])
             # (f == 1 and b == 0) or (f == 0 and b == 1)
             if f + b == 1:
                 # flip s
@@ -625,6 +639,32 @@ class TestBP(unittest.TestCase):
 #     return Tests
 
 
+def load_states():
+    # Load 'states' and 'p' (relative frequencies)
+    fn_states = 'pickled_states.pkl'
+    with open(fn_states, 'rb') as f:
+        data = pickle.load(f)
+        states, p = data
+
+    df = {'states':[], 'p':[], 'type':[]}
+    for s, p_ in zip(states, p):
+        df['states'].append(s)
+        df['p'].append(p_)
+        # df['len'].append(len(s))
+        df['type'].append(type(s).__name__)
+    df = pd.DataFrame(df)
+
+    # check if all states are strings
+    if not all([type(s) == str for s in df['states']]):
+        raise ValueError('All states should be strings')
+
+    print(df['type'].groupby(df['type']).count())
+
+    count_states_with_len_5 = sum([len(s) == 5 for s in states])
+    if count_states_with_len_5 != 32:
+        raise ValueError(f'Expected 32 states with length 5, got {count_states_with_len_5}')
+    return states, p
+
 if __name__ == "__main__":
     unittest.main()
     seed = 10
@@ -637,4 +677,5 @@ if __name__ == "__main__":
     df_train = df[df['pdb_code'].isin(pdb_train)]
     states = list(df_train['b'])
     p = list(df_train['relfreq'])
+
     

@@ -1,123 +1,162 @@
 import os
 import time
 import pickle
-import pandas as pd
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
-from fbs.bpfbs import FBS, DFS, bp
-from sklearn.model_selection import train_test_split
-from openpyxl.workbook import Workbook
+from fbs.bpfbs import FBS, DFS, DDGP, bp, load_states
 
-def load_states():
-    # Load 'states' and 'p' (relative frequencies)
-    fn_states = 'pickled_states.pkl'
-    with open(fn_states, 'rb') as f:
-        data = pickle.load(f)
-        states, p = data
 
-    df = {'states':[], 'p':[], 'type':[]}
-    for s, p_ in zip(states, p):
-        df['states'].append(s)
-        df['p'].append(p_)
-        # df['len'].append(len(s))
-        df['type'].append(type(s).__name__)
-    df = pd.DataFrame(df)
-
-    print(df['type'].groupby(df['type']).count())
-
-    count_states_with_len_5 = sum([len(s) == 5 for s in states])
-    if count_states_with_len_5 != 32:
-        raise ValueError(f'Expected 32 states with length 5, got {count_states_with_len_5}')
-    return states, p
-
-def process_file(fn):
-    with open(os.path.join('ddgp', fn), 'rb') as f:
+def process_file(fn, n, states, p, verbose=False):
+    tic = time.time()
+    with open(fn, "rb") as f:
         D = pickle.load(f)
+    toc = time.time() - tic
+    if verbose:
+        print(f"Loaded {fn} in {toc:.2E} secs")
 
+    tic = time.time()
     fbs = FBS(D, states, p)
     dfs = DFS(D)
+    toc = time.time() - tic
+    if verbose:
+        print(f"Preprocessed {fn} in {toc:.2E} secs")
 
-    statistic = {'fn': [], 'method':[], 'time_secs': []}
+    statistic = []
 
-    statistic['fn'].append(fn)
-    statistic['method'].append('dfs')
+    item = {"fn": fn, "n":n, "method": "dfs"}
     try:
         tic = time.time()
         bp(D, dfs)
         toc = time.time() - tic
-        statistic['time_secs'].append(toc)
+        item["time_secs"] = toc
     except:
-        statistic['time_secs'].append(None)
+        item["time_secs"] = None
+    statistic.append(item)
 
-    statistic['fn'].append(fn)
-    statistic['method'].append('fbs')
+    # print statistics
+    if verbose:
+        print(f"DFS: {item['time_secs']:.2E} secs")
+
+    item = {"fn": fn, "n":n, "method": "fbs"}
     try:
         tic = time.time()
         bp(D, fbs)
-        toc = time.time() - tic    
-        statistic['time_secs'].append(toc)
+        toc = time.time() - tic
+        item["time_secs"] = toc
     except:
-        statistic['time_secs'].append(None)
+        item["time_secs"] = None
+    statistic.append(item)
+
+    # print statistics
+    if verbose:
+        print(f"FBS: {item['time_secs']:.2E} secs")
 
     return statistic
 
-if __name__ == '__main__':
+
+def get_tests():
+    from tqdm import tqdm
+
+    df = {"fn": [], "n": []}
+
+    for fn in tqdm(os.listdir("ddgp")):
+        fn = os.path.join("ddgp", fn)
+        with open(fn, "rb") as f:
+            D: DDGP = pickle.load(f)
+
+        df["fn"].append(fn)
+        df["n"].append(D.n)
+
+    df = pd.DataFrame(df)
+
+    # set bins
+    bins = [0, 50, 100, 200, 300, np.inf]
+    df["bin"] = df["n"].apply(lambda x: np.digitize(x, bins))
+
+    return df
+
+
+def create_samples(ntests, df_tests):
+    import random
+    random.seed(42)
+    
+    df_sample = []
+    for bin in df_tests['bin'].unique():
+        df_tests_bin = df_tests[df_tests['bin'] == bin]
+        if len(df_tests_bin) < ntests:
+            ntests = len(df_tests_bin)
+        for _ in range(ntests):
+            idx = random.choice(df_tests_bin.index)
+            df_sample.append(df_tests_bin.loc[idx])
+    
+    df_sample = pd.DataFrame(df_sample)
+    df_sample.sort_values(['bin','n'], inplace=True)
+    return df_sample
+
+
+def main():
+
+    # set random seed
+
     states, p = load_states()
 
-    # Get list of files with their sizes
-    files_with_sizes = [(fn, os.stat(os.path.join('ddgp', fn)).st_size) for fn in os.listdir('ddgp')]
+    df_tests = get_tests()
 
-    # # Sort files by size
-    sorted_files = [fn for fn, _ in sorted(files_with_sizes, key=lambda x: x[1])]
-    # sorted_sizes = [int(mysize) for _, mysize in sorted(files_with_sizes, key=lambda x: x[1])]
+    df_sample = create_samples(5, df_tests)
 
+    statistic = []
+    for _, row in tqdm(list(df_sample.iterrows())):        
+        statistic.extend(process_file(row['fn'], row['n'], states, p))
+
+    df_statistic = pd.DataFrame(statistic)
+    df_statistic.to_csv("df_statistic.csv", index=False)
+
+
+def test_instance():
+
+    import fbs
+    import time
+    import pickle
+    import numpy as np
+    import pandas as pd
+
+    fn_ddgp = "ddgp/1nm4_model1_chainA_segment0_ddgp.pkl"
+    with open(fn_ddgp, "rb") as f:
+        D:DDGP = pickle.load(f)
+
+    fn_sol = "original_sol/" + os.path.basename(fn_ddgp).replace('_ddgp.pkl', '.sol')
+    xsol = np.loadtxt(fn_sol)
     
-    # instâncias de tamanho nao maior que algo por volta de 50 vertices
-    sorted_files_with_sizes = [(fn, mysize) for fn, mysize in sorted(files_with_sizes, key=lambda x: x[1])]
-    last_index = 0
-    for i in range(len(sorted_files_with_sizes)):
-        if sorted_files_with_sizes[i][1] > 11000:
-            last_index = i
-            break    
+    fn_bin = "binary/" + os.path.basename(fn_ddgp).replace('_ddgp.pkl', '_binary.csv')
+    xbin = pd.read_csv(fn_bin)
+    xbin['b'] = xbin['b'].fillna(1)
+    xbin['b'] = xbin['b'].astype(int)
 
-    # tomando 800 instancias de tamanho menor ou igual a 50 vertices
-    small_test_indexes = sorted(np.random.choice(last_index, 800, replace=False))
-    sorted_small_test_files = [sorted_files[index] for index in small_test_indexes]
+    # permute the solution
+    xsol = xsol[xbin['order']]
+    assert D.check_coord_solution(xsol)
 
-    statistic = {'fn': [], 'method':[], 'time_secs': []}
-    # for k, fn in tqdm(enumerate(sorted_files)):
-    for k, fn in tqdm(enumerate(sorted_small_test_files)):
-        try:
-            statistic_file = process_file(fn)
-            for key in statistic_file.keys():
-                statistic[key].extend(statistic_file[key])
-        except:
-            print(f'Error processing file {fn}')
-        
-        # if k > 10:
-        #     break
-
-    statistic = pd.DataFrame(statistic)
-    methods = statistic['method'].unique()
-
-    statistic.to_csv('df_times.csv', index=False)
-    statistic.to_excel('df_times.xlsx', index=False)
-
-    statistic_speedup = statistic.groupby(['fn']).agg({'method' : lambda x : list(x), 'time_secs' : lambda y : list(y)}).reset_index()
-    for i in range(len(methods)):
-        this_method = 'method_' + methods[i]
-        statistic_speedup[this_method] = statistic_speedup['method'].apply(lambda x : x[i])
-        this_time = 'time_' + methods[i]
-        statistic_speedup[this_time] = statistic_speedup['time_secs'].apply(lambda x : x[i])
-    statistic_speedup = statistic_speedup[['fn', 'method_dfs', 'method_fbs', 'time_dfs', 'time_fbs']]
+    assert D.check_binary_solution(xbin['b'].values)
     
-    dtol=1e-6
-    statistic_speedup['speed_up'] = 0.0
-    statistic_speedup['speed_up'] = statistic_speedup.apply(lambda x : 1.0 if (float(x.loc['time_dfs']) == 0.0) & (float(x.loc['time_fbs']) == 0.0) else float(x.loc['speed_up']), axis=1)
-    statistic_speedup['time_dfs'] = statistic_speedup.apply(lambda x : dtol if (float(x.loc['time_dfs']) == 0.0) & (float(x.loc['time_fbs']) != 0.0) else float(x.loc['time_dfs']), axis=1)
-    statistic_speedup['time_fbs'] = statistic_speedup.apply(lambda x : dtol if (float(x.loc['time_dfs']) != 0.0) & (float(x.loc['time_fbs']) == 0.0) else float(x.loc['time_fbs']), axis=1)
-    statistic_speedup['speed_up'] = statistic_speedup.apply(lambda x : None if x.loc['speed_up'] == None else x.loc['speed_up'], axis=1)
-    
-    statistic_speedup['speed_up'] = statistic_speedup.apply(lambda x : float(x.loc['time_dfs']) / float(x.loc['time_fbs']) if float(x.loc['speed_up'] == 0.0) else x.loc['speed_up'], axis=1)
-    statistic_speedup.to_excel('df_speedup.xlsx', index=False)
-    arroz = 1
+    print(f"xbin: {xbin['b'].tolist()}")
+
+    states, p = load_states()
+
+    fbs = FBS(D, states, p)
+    dfs = DFS(D)
+
+    tic = time.time()
+    x = bp(D, dfs)
+    toc = time.time() - tic
+    print(f"DFS: {toc:.2E} secs")
+
+    tic = time.time()
+    x = bp(D, fbs)
+    toc = time.time() - tic
+    print(f"FBS: {toc:.2E} secs")
+
+
+if __name__ == "__main__":
+    # main()
+    test_instance()
