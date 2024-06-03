@@ -117,7 +117,7 @@ def read_states():
 def test_instance():
     states, p = read_states()
 
-    fn = '2d9t_model1_chainA_segment0_ddgp.pkl'
+    fn = '2kb9_model1_chainA_segment4'
     fn_bsol = os.path.join('bsol', fn + '_binary.csv')
     fn_ddgp = os.path.join('ddgp', fn + '_ddgp.pkl')    
     

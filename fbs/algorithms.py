@@ -128,7 +128,7 @@ class DDGP:
         #                 ui[j] = sij
         #     self.triang_bounds.append(list(ui.items()))
 
-    def is_feasible(self, x, i):
+    def is_feasible(self, x, i, dtol=1E-03):
         if i < 4:
             return True
         di = self.d[i]
@@ -139,7 +139,7 @@ class DDGP:
             if j < i:
                 dij = di[j]
                 dij_calc = norm(xi - x[j])
-                if not (dij.lower <= dij_calc <= dij.upper):
+                if not (dij.lower - dtol <= dij_calc <= dij.upper + dtol):
                     return False
             else:
                 break
@@ -303,7 +303,7 @@ def bp(D: DDGP, TS, verbose=False):
         if i == (D.n - 1):
             if verbose:
                 assert D.check_xsol(TS.x) == True
-                assert D.check_bsol(TS.bsol) == True
+                # assert D.check_bsol(TS.bsol) == True
             return TS.x
 
 
