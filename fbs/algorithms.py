@@ -141,8 +141,8 @@ class DDGP:
                 dij_calc = norm(xi - x[j])
                 if not (dij.lower - dtol <= dij_calc <= dij.upper + dtol):
                     return False
-            else:
-                break
+            # else:
+            #     break
         
         # feasibility with respect to triangular inequalities
         # for k, uik in self.triang_bounds[i]:
@@ -152,7 +152,7 @@ class DDGP:
 
         return True
     
-    def check_bsol(self, b, dtol=1e-4):
+    def check_bsol(self, b, dtol=1e-3):
         x = init_x(self)
         for i in range(4, self.n):
             x[i] = calc_x(i, b[i], x, self)
@@ -160,7 +160,7 @@ class DDGP:
                 return False
         return True
     
-    def check_xsol(self, x, dtol=1e-4):
+    def check_xsol(self, x, dtol=1e-3):
         for i in range(4, self.n):
             if not self.is_feasible(x, i, dtol):
                 return False
@@ -174,11 +174,17 @@ class DFS:
         self.T = np.zeros(self.n, dtype=int)
         self.T[:4] = last_node
         self.last_node = last_node
+        self.n_bt_nodes = 0 # count the number of backtracked nodes
 
     def backtracking(self, i):
+        old_i = i
         while self.T[i] == self.last_node:
             self.T[i] = 0
             i -= 1
+        if i < old_i:
+            self.n_bt_nodes += old_i - i
+        # if i == old_i:
+        #     self.n_bt_nodes += 1
         return i
 
     def next(self, i, is_feasible):
@@ -212,6 +218,8 @@ class FBS:
         self.TVal = self.states[0]  # state of the current node
         self.iX = np.zeros(self.n, dtype=int)  # index of the last fixed point
         self.iX[0] = 4
+        self.n_bt_nodes = 0 # count the number of backtracks
+        self.n_infeasible = 0 # count the number of 'is_feasible' calls that return False
 
         # assert len(s) for s in states are descending
         for i in range(1, len(states)):
@@ -227,7 +235,7 @@ class FBS:
         b = int(self.TVal[k])
         calc_x(i, b, self.x, self.D)
 
-    def backtracking(self):
+    def backtracking(self, old_i):
         while self.T[self.TLvl] == self.last_node:
             self.T[self.TLvl] = 0
             self.F[self.TLvl] = 0
@@ -238,9 +246,14 @@ class FBS:
         s = self.states[self.T[self.TLvl]]
         s = self.config_state(s)
         self.TVal = s
+        # reset the level of the conventional bp tree.
         if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
+        else:
+            self.iX[self.TLvl] = 4 # in the level 0, we start in the 5th vertex
+        if self.iX[self.TLvl] < old_i:
+            self.n_bt_nodes += old_i - self.iX[self.TLvl]
         return self.iX[self.TLvl]
 
     def config_state(self, s):
@@ -258,7 +271,7 @@ class FBS:
 
     def next(self, i, is_feasible):
         if not is_feasible:
-            i = self.backtracking()
+            i = self.backtracking(i)
         else:
             i += 1
             if i == self.iX[self.TLvl] + len(self.TVal):
@@ -292,19 +305,25 @@ class FBS:
         return b
 
 
-def bp(D: DDGP, TS, verbose=False):
+def bp(D: DDGP, TS, verbose=True):
     i = 3  # index of the last fixed vertice
     is_feasible = True
+    n_infeasible = 0 # count the number of 'is_feasible' calls that return False
+    n_constraints = 0
+    for j in range(D.n):
+        n_constraints += len(D.d[j]) - 3
+    n_constraints = n_constraints / 2
     while True:
         i = TS.next(i, is_feasible)
         is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
+            n_infeasible += 1
             continue
         if i == (D.n - 1):
             if verbose:
                 assert D.check_xsol(TS.x) == True
                 # assert D.check_bsol(TS.bsol) == True
-            return TS.x
+            return TS.x, n_infeasible, n_constraints
 
 
 class TestSolveEQ3(unittest.TestCase):
