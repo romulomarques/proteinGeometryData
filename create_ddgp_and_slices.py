@@ -49,7 +49,7 @@ def bsol_split_train_test(random_state):
     return train_bsol_files, test_bsol_files
 
 
-def create_ddgp(fn_bsol, noise=1.0, verbose=False):
+def create_ddgp(fn_bsol, noise=0.0, verbose=False):
     if verbose:
         print("create_ddgp")
     bsol = pd.read_csv(os.path.join(wd_bsol, fn_bsol))
@@ -106,11 +106,11 @@ def create_ddgp(fn_bsol, noise=1.0, verbose=False):
 
     # adding distance that depending on x
     bsol_H = bsol[bsol["atom_name"].str.startswith("H")]
-    for i in range(bsol_H.shape[0]):
-        row_i = bsol.loc[i]
-        for j in range(i + 1, bsol_H.shape[0]):
+    indexes = list(bsol_H.index)
+    for k, i in enumerate(indexes):
+        for j in indexes[k+1:]:
             dij = norm(x[i] - x[j])
-            if dij > 5.0:
+            if dij > 5:
                 continue
             if i in d and j in d[i]:
                 continue
@@ -118,6 +118,23 @@ def create_ddgp(fn_bsol, noise=1.0, verbose=False):
             t_lower = np.random.uniform(0.0, noise)
             d[i][j] = DistanceBounds(dij - t_lower, dij + t_upper)
             d[j][i] = d[i][j]
+
+    # ######
+    # num_prune_edges = 2
+    # for i in range(4, n):
+    #     if i % 2 == 0:
+    #         continue
+    #     # A: set of antecessor points that are not parents
+    #     A = set(range(i)) - set(parents[i])
+    #     for j in range(i):
+    #         if i in d and j in d[i]:
+    #             A = A - set([j])
+    #     A = list(A)
+    #     A = np.random.choice(A, np.min([num_prune_edges, len(A)]))
+    #     for j in A:
+    #         dij = norm(x[i] - x[j])
+    #         d[i][j] = DistanceBounds(dij, dij)
+    # ######
 
     # symmetric
     for i in d.keys():
@@ -225,12 +242,18 @@ if __name__ == "__main__":
     random_state = 42
     train_bsol_files, test_bsol_files = bsol_split_train_test(random_state)
 
-    # create ddgp tests
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        # Wrap the executor map with tqdm for progress bar
-        list(
-            tqdm(executor.map(create_ddgp, test_bsol_files), total=len(test_bsol_files))
-        )
+    # # create ddgp tests
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     # Wrap the executor map with tqdm for progress bar
+    #     list(
+    #         tqdm(executor.map(create_ddgp, test_bsol_files), total=len(test_bsol_files))
+    #     )
 
+    # create ddgp tests
+    # wrap the executor map with tqdm for progress bar
+    for file in tqdm(test_bsol_files):
+        create_ddgp(file)
+    
+    
     # create slices
     create_slices(train_bsol_files)
