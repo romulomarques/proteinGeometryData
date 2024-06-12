@@ -1,6 +1,8 @@
-import sys
+import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
 
 
 def extract_atoms_with_reorder(df):
@@ -62,13 +64,16 @@ def read_instance(file_path):
 def extract_prune_edges(atoms, dij_max=5):
     edges = []
     for i in range(len(atoms)):
-        ai_name, ai_x = atoms[i][3], atoms[i][5]
+        ai_residue_number, ai_name, ai_x = atoms[i][0], atoms[i][3], atoms[i][5]
         # add the only one CA pruning edge
         if ai_name == "CA" and i > 3:
             j = i - 4
-            aj_name, aj_x = atoms[j][3], atoms[j][5]
+            aj_residue_number, aj_name, aj_x = atoms[j][0], atoms[j][3], atoms[j][5]
             dij = np.linalg.norm(ai_x - aj_x)
-            edges.append((j, i, aj_name, ai_name, dij))
+            # j < i
+            edges.append(
+                (j, i, aj_name, ai_name, aj_residue_number, ai_residue_number, dij)
+            )
             continue
 
         # keep only hydrogens
@@ -77,27 +82,80 @@ def extract_prune_edges(atoms, dij_max=5):
 
         # skip the discretization edges
         for j in range(i + 4, len(atoms)):
-            aj_name, aj_x = atoms[j][3], atoms[j][5]
+            aj_residue_number, aj_name, aj_x = atoms[j][0], atoms[j][3], atoms[j][5]
             if aj_name not in ["H", "HA"]:
                 continue
             dij = np.linalg.norm(ai_x - aj_x)
             if dij < dij_max:
-                edges.append((i, j, ai_name, aj_name, dij))
+                edges.append(
+                    (i, j, ai_name, aj_name, ai_residue_number, aj_residue_number, dij)
+                )
     edges = sorted(edges)
     return edges
 
 
-if __name__ == "__main__":
-    # Path to the uploaded file
-    file_path = sys.argv[1]
-
+def process_instance(fn_segment):
     # Read and process the instance
-    df = read_instance(file_path)
+    df = read_instance(fn_segment)
 
-    # Extract and reorder atoms
+    # create/save atoms file as a csv
     atoms = extract_atoms_with_reorder(df)
 
+    fn_xsol = os.path.join("xsol", os.path.basename(fn_segment))
+    df_atoms = pd.DataFrame(atoms, columns=df.columns)
+    df_atoms.to_csv(fn_xsol, index=False)
+
+    # create prune edges file as a csv
     prune_edges = extract_prune_edges(atoms)
 
-    for eij in prune_edges:
-        print("(%d, %d, %s, %s, %.1f)" % (eij[0], eij[1], eij[2], eij[3], eij[4]))
+    columns = [
+        "i",
+        "j",
+        "i_name",
+        "j_name",
+        "i_residue_number",
+        "j_residue_number",
+        "dij",
+    ]
+    df = pd.DataFrame(prune_edges, columns=columns)
+    fn_dmdgp = os.path.join("dmdgp", os.path.basename(fn_segment))
+    df.to_csv(fn_dmdgp, index=False)
+
+
+def test_process_instance():
+    os.makedirs("segment", exist_ok=True)
+    os.makedirs("xsol", exist_ok=True)
+
+    fn_segment = "segment/1a1u_model1_chainA_segment0.csv"
+    process_instance(fn_segment)
+
+
+def main():
+    # Ensure the dmdgp folder is created
+    print("Creating dmdgp directory...")
+    os.makedirs("dmdgp", exist_ok=True)
+
+    print("Creating xsol directory...")
+    os.makedirs("xsol", exist_ok=True)
+
+    # List all .csv files in the segment directory
+    print("Processing instances...")
+    fn_segments = [f for f in os.listdir("segment") if f.endswith(".csv")]
+
+    # Process the instances in parallel
+    print("Creating DMDGP files...")
+    with ProcessPoolExecutor() as executor:
+        list(
+            tqdm(
+                executor.map(
+                    process_instance,
+                    [os.path.join("segment", fn) for fn in fn_segments],
+                ),
+                total=len(fn_segments),
+            )
+        )
+
+
+if __name__ == "__main__":
+    # test_process_instance()
+    main()
