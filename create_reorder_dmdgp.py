@@ -5,6 +5,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
 
+# add, for each residue, a repetition of the CA atom at the end of the residue
 def extract_atoms_with_reorder(df):
     min_residue_number = int(df.iloc[0]["residue_number"])
     atoms = [
@@ -65,7 +66,7 @@ def extract_prune_edges(atoms, dij_max=5):
     edges = []
     for i in range(len(atoms)):
         ai_residue_number, ai_name, ai_x = atoms[i][0], atoms[i][3], atoms[i][5]
-        # add the only one CA pruning edge
+        # add the only CA pruning edge
         if ai_name == "CA" and i > 3:
             j = i - 4
             aj_residue_number, aj_name, aj_x = atoms[j][0], atoms[j][3], atoms[j][5]
