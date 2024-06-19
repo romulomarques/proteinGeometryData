@@ -6,21 +6,17 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 # add, for each residue, a repetition of the CA atom at the end of the residue
-def extract_atoms_with_reorder(df):
-    min_residue_number = int(df.iloc[0]["residue_number"])
-    atoms = [
-        df.query(f"residue_number=={min_residue_number} and atom_name=='N'").values[0],
-        df.query(f"residue_number=={min_residue_number} and atom_name=='HA'").values[0],
-        df.query(f"residue_number=={min_residue_number} and atom_name=='C'").values[0],
-        df.query(f"residue_number=={min_residue_number} and atom_name=='CA'").values[0],
-    ]
+def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
 
-    residue_number = min_residue_number + 1
+    atoms = [atom for atom in df.iloc[:4].values]
+
+    residue_number = int(df.iloc[0]["residue_number"]) + 1
     for i in range(4, len(df)):
         atom = df.iloc[i]
         if atom["residue_number"] == residue_number:
             atoms.append(atom.values)
         else:
+            # append duplicate CA atom
             atoms.append(df.iloc[i - 3].values)
             atoms.append(atom.values)
             residue_number = atom["residue_number"]
@@ -28,9 +24,9 @@ def extract_atoms_with_reorder(df):
     return atoms
 
 
-def check_segment(df:pd.DataFrame) -> bool:
+def check_segment(df: pd.DataFrame) -> bool:
     # check if the segment is valid
-    
+
     df_grouped_by_residue = (
         df[["residue_number", "atom_name"]]
         .groupby("residue_number")
@@ -49,15 +45,18 @@ def check_segment(df:pd.DataFrame) -> bool:
 
     # the rest of the residues should have the following atoms: N, CA, C, H, HA
     expected_atoms = {"N", "HA", "H", "C", "CA"}
-    for i in range(1, len(df_grouped_by_residue)):
+
+    def is_valid_residue(row: pd.Series) -> bool:
         # check if there is the exactly number of expected atoms
-        if len(df_grouped_by_residue.iloc[i]["atom_name"]) != len(expected_atoms):
+        if len(row["atom_name"]) != len(expected_atoms):
             return False
         # check if the atoms are the expected ones
-        if set(df_grouped_by_residue.iloc[i]["atom_name"]) != expected_atoms:
+        if set(row["atom_name"]) != expected_atoms:
             return False
+        # check if the atoms are in the correct order
+        return True
 
-    return True
+    return all(df_grouped_by_residue[1:].apply(is_valid_residue, axis=1))
 
 
 def read_instance(file_path):
@@ -128,27 +127,6 @@ def extract_prune_edges(atoms, dij_max=5):
                     (i, j, ai_name, aj_name, ai_residue_number, aj_residue_number, dij)
                 )
     edges = sorted(edges)
-    return edges
-
-
-def process_instance(fn_segment:str, verbose:bool=False) -> None:
-    # Read and process the instance
-    try:
-        df = read_instance(fn_segment)
-    except ValueError as e:
-        if verbose:
-            print(f"Error processing {fn_segment}: {e}")
-        return
-
-    # create/save atoms file as a csv
-    atoms = extract_atoms_with_reorder(df)
-
-    fn_xsol = os.path.join("xsol", os.path.basename(fn_segment))
-    df_atoms = pd.DataFrame(atoms, columns=df.columns)
-    df_atoms.to_csv(fn_xsol, index=False)
-
-    # create prune edges file as a csv
-    prune_edges = extract_prune_edges(atoms)
 
     columns = [
         "i",
@@ -159,14 +137,94 @@ def process_instance(fn_segment:str, verbose:bool=False) -> None:
         "j_residue_number",
         "dij",
     ]
-    df = pd.DataFrame(prune_edges, columns=columns)
-    fn_dmdgp = os.path.join("dmdgp", os.path.basename(fn_segment))
-    df.to_csv(fn_dmdgp, index=False)
+    df_prune = pd.DataFrame(edges, columns=columns)
+    return df_prune
+
+
+def read_xsol(fn_xsol):
+    df = pd.read_csv(fn_xsol)
+    df["x"] = df["x"].apply(
+        lambda x: np.array(list(filter(None, x[1 : len(x) - 1].split(" ")))).astype(
+            np.double
+        )
+    )
+
+    return df
+
+
+def get_semispace_sign(point, plane_points):
+    """
+    Calculate the signed distance from a point to a plane defined by three points.
+    Parameters:
+        point (numpy array): The point [x, y, z] we want to check.
+        plane_points (numpy array): 3x3 array where each row is a point [x, y, z] defining the plane.
+    Returns:
+        float: The signed distance from the point to the plane.
+    """
+    # Calculate the normal vector of the plane
+    normal_vector = np.cross(
+        plane_points[1] - plane_points[0], plane_points[2] - plane_points[0]
+    )
+
+    if np.linalg.norm(normal_vector) == 0:
+        raise ValueError("The plane points are collinear")
+
+    # Calculate the signed distance from the point to the plane
+    u = point - plane_points[0]  # in case of duplicate points, u will be zero
+    semispace_sign = np.dot(normal_vector, u)
+
+    return semispace_sign
+
+
+def get_bit(df_xbsol: pd.DataFrame, row: pd.Series) -> int:
+    i = row.name  # row original index
+    if i < 3:
+        return -1 # dummy value
+    else:
+        plane_points = df_xbsol.iloc[i - 3 : i]["x"].values
+        semispace_sign = get_semispace_sign(row["x"], plane_points)
+        # duplicate atoms will have bit 1, because the semispace sign is 0
+        return int(semispace_sign >= 0)
+
+
+def get_prune_bsol(bsol: np.array, row: pd.Series) -> tuple:
+    i = int(row["i"])
+    j = int(row["j"])
+    str_b = "".join([str(bit) for bit in bsol[i + 3 : j + 1]])
+    return str_b
+
+
+def process_instance(fn_segment: str, verbose: bool = False) -> None:
+    # Read and process the instance
+    try:
+        df = read_instance(fn_segment)
+    except ValueError as e:
+        if verbose:
+            print(f"Error processing {fn_segment}: {e}")
+        return
+
+    # create/save xbsol file as a csv
+    atoms = extract_atoms_with_reorder(df)
+    df_xbsol = pd.DataFrame(atoms, columns=df.columns)
+
+    df_xbsol["b"] = df_xbsol.apply(lambda row: get_bit(df_xbsol, row), axis=1)
+
+    fn_xbsol = os.path.join("xbsol", os.path.basename(fn_segment))
+    df_xbsol.to_csv(fn_xbsol, index=False)
+
+    # create prune edges file as a csv
+    df_prune = extract_prune_edges(atoms)
+    bsol = df_xbsol["b"].values
+    df_prune["bsol"] = df_prune.apply(lambda row: get_prune_bsol(bsol, row), axis=1)
+
+    fn_dmdgp = os.path.join("prune_bsol", os.path.basename(fn_segment))
+    df_prune.to_csv(fn_dmdgp, index=False)
 
 
 def test_process_instance():
     os.makedirs("segment", exist_ok=True)
-    os.makedirs("xsol", exist_ok=True)
+    os.makedirs("xbsol", exist_ok=True)
+    os.makedirs("prune_bsol", exist_ok=True)
 
     fn_segment = "segment/1a1u_model1_chainA_segment0.csv"
     # fn_segment = 'segment/1ah1_model1_chainA_segment0.csv'
@@ -175,11 +233,11 @@ def test_process_instance():
 
 def main():
     # Ensure the dmdgp folder is created
-    print("Creating dmdgp directory...")
-    os.makedirs("dmdgp", exist_ok=True)
+    print("Creating prune_bsol directory...")
+    os.makedirs("prune_bsol", exist_ok=True)
 
-    print("Creating xsol directory...")
-    os.makedirs("xsol", exist_ok=True)
+    print("Creating xbsol directory...")
+    os.makedirs("xbsol", exist_ok=True)
 
     # List all .csv files in the segment directory
     print("Processing instances...")
@@ -200,5 +258,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # test_process_instance()
-    main()
+    test_process_instance()
+    # main()
