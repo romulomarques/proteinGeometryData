@@ -258,5 +258,5 @@ def main():
 
 
 if __name__ == "__main__":
-    test_process_instance()
-    # main()
+    # test_process_instance()
+    main()
