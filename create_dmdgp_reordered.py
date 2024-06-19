@@ -28,6 +28,38 @@ def extract_atoms_with_reorder(df):
     return atoms
 
 
+def check_segment(df:pd.DataFrame) -> bool:
+    # check if the segment is valid
+    
+    df_grouped_by_residue = (
+        df[["residue_number", "atom_name"]]
+        .groupby("residue_number")
+        .agg(list)
+        .reset_index()
+    )
+
+    # the first residue should have the following atoms: N, CA, C, HA
+    expected_atoms = {"N", "HA", "C", "CA"}
+    # check if there is the exactly number of expected atoms
+    if len(df_grouped_by_residue.iloc[0]["atom_name"]) != len(expected_atoms):
+        return False
+    # check if the atoms are the expected ones
+    if set(df_grouped_by_residue.iloc[0]["atom_name"]) != expected_atoms:
+        return False
+
+    # the rest of the residues should have the following atoms: N, CA, C, H, HA
+    expected_atoms = {"N", "HA", "H", "C", "CA"}
+    for i in range(1, len(df_grouped_by_residue)):
+        # check if there is the exactly number of expected atoms
+        if len(df_grouped_by_residue.iloc[i]["atom_name"]) != len(expected_atoms):
+            return False
+        # check if the atoms are the expected ones
+        if set(df_grouped_by_residue.iloc[i]["atom_name"]) != expected_atoms:
+            return False
+
+    return True
+
+
 def read_instance(file_path):
     # read csv file
     df = pd.read_csv(file_path)
@@ -58,6 +90,10 @@ def read_instance(file_path):
     df["atom_score"] = df["atom_name"].apply(comparison)
     df.sort_values(by=["residue_number", "atom_score"], inplace=True)
     df.drop(columns=["atom_score"], inplace=True)
+
+    # check if the segment is valid
+    if not check_segment(df):
+        raise ValueError(f"Invalid segment: {file_path}")
 
     return df
 
@@ -95,9 +131,14 @@ def extract_prune_edges(atoms, dij_max=5):
     return edges
 
 
-def process_instance(fn_segment):
+def process_instance(fn_segment:str, verbose:bool=False) -> None:
     # Read and process the instance
-    df = read_instance(fn_segment)
+    try:
+        df = read_instance(fn_segment)
+    except ValueError as e:
+        if verbose:
+            print(f"Error processing {fn_segment}: {e}")
+        return
 
     # create/save atoms file as a csv
     atoms = extract_atoms_with_reorder(df)
@@ -128,6 +169,7 @@ def test_process_instance():
     os.makedirs("xsol", exist_ok=True)
 
     fn_segment = "segment/1a1u_model1_chainA_segment0.csv"
+    # fn_segment = 'segment/1ah1_model1_chainA_segment0.csv'
     process_instance(fn_segment)
 
 
