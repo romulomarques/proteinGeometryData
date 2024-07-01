@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 # add, for each residue, a repetition of the CA atom at the end of the residue
 def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
-
+    
     def atom_score_first_residue(row: pd.Series) -> int:
         atom_score = 0
         if row["atom_name"] == "N":
@@ -20,7 +20,11 @@ def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
             atom_score = 3            
         return atom_score
 
-    atoms = sorted([atom for atom in df.iloc[:4].values], key=atom_score_first_residue)
+    df_1st_4 = df.iloc[:4].copy()
+    df_1st_4["score"] = df.apply(atom_score_first_residue, axis=1)
+    df_1st_4.sort_values(by=["score"], inplace=True)
+    df_1st_4 = df_1st_4.drop(["score"], axis=1)
+    atoms = [atom for atom in df_1st_4.values]
 
     residue_number = int(df.iloc[0]["residue_number"]) + 1
     for i in range(4, len(df)):
