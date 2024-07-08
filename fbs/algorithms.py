@@ -4,16 +4,16 @@
 # 2. Teste com distâncias de poda inexatas, onde podemos postergar a poda tomando intervalos maiores;
 
 import os
-import pickle
 import unittest
 import numpy as np
-import pandas as pd
 from numpy.linalg import norm, solve
+from numba import jit, njit, prange
 
 
-wd = '/home/michael/gitrepos/proteinGeometryData'
+wd = "/home/michael/gitrepos/proteinGeometryData"
 # wd = 'C:/Users/romul/Documents/PythonProjects/proteinGeometryData'
-wd_binary = os.path.join(wd, 'binary')
+wd_binary = os.path.join(wd, "binary")
+
 
 def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
     u = b - a
@@ -58,7 +58,6 @@ def solveEQ3(a, b, c, da, db, dc, stol=1e-4):
 def calc_x(i, b, x, D, debug=False):
     ia, ib, ic = D.parents[i]
     da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
-    da, db, dc = da.lower, db.lower, dc.lower
     A, B, C = x[ia], x[ib], x[ic]
     p, w = solveEQ3(A, B, C, da, db, dc)
     x[i] = p + w if (b == 1) else p - w
@@ -77,40 +76,35 @@ def init_x(D):
     x = np.zeros((n, 3), dtype=float)
 
     # set x1
-    d01 = D.d[0][1].lower
+    d01 = D.d[0][1]
     x[1][0] = d01
 
     # set x2
-    d02 = D.d[0][2].lower
-    d12 = D.d[1][2].lower
+    d02 = D.d[0][2]
+    d12 = D.d[1][2]
     cos_theta = (d02 * d02 + d01 * d01 - d12 * d12) / (2 * d01 * d02)
     sin_theta = np.sqrt(1 - cos_theta * cos_theta)
     x[2][0] = d02 * cos_theta
     x[2][1] = d02 * sin_theta
 
     # set x3
-    d03 = D.d[0][3].lower
-    d13 = D.d[1][3].lower
-    d23 = D.d[2][3].lower
+    d03 = D.d[0][3]
+    d13 = D.d[1][3]
+    d23 = D.d[2][3]
     p, w = solveEQ3(x[0], x[1], x[2], d03, d13, d23)
     x[3] = p + w
     return x
 
 
-class DistanceBounds:
-    def __init__(self, lower, upper):
-        self.lower = lower
-        self.upper = upper
-
-    def __str__(self):
-        return f"({self.lower}, {self.upper})"
-
 class DDGP:
     def __init__(self, d: dict, parents: list) -> None:
-        
+
         self.d = d
         self.parents = parents
         self.n = np.max(list(d.keys())) + 1
+
+        # symmetrize distance matrix
+        self.symmetrize_distance_matrix()
 
         # self.triang_bounds = []
         # triangular inequalities
@@ -128,22 +122,31 @@ class DDGP:
         #                 ui[j] = sij
         #     self.triang_bounds.append(list(ui.items()))
 
-    def is_feasible(self, x, i, dtol=1E-03):
+    def symmetrize_distance_matrix(self) -> dict:
+        for i in range(self.n):
+            if i not in self.d:
+                continue
+            for j in self.d[i]:
+                if j not in self.d:
+                    self.d[j] = {}
+                self.d[j][i] = self.d[i][j]
+
+    def is_feasible(self, x, i, dtol=1e-03):
         if i < 4:
             return True
         di = self.d[i]
         xi = x[i]
-        L = list(di.keys())
+        L = list(di.keys())  # antecessors
         # feasibility with respect to antecessors
         for j in L:
             if j < i:
                 dij = di[j]
                 dij_calc = norm(xi - x[j])
-                if not (dij.lower - dtol <= dij_calc <= dij.upper + dtol):
+                if np.abs(dij - dij_calc) > dtol:
                     return False
             # else:
             #     break
-        
+
         # feasibility with respect to triangular inequalities
         # for k, uik in self.triang_bounds[i]:
         #     dik = norm(xi - x[k])
@@ -151,7 +154,7 @@ class DDGP:
         #         return False
 
         return True
-    
+
     def check_bsol(self, b, dtol=1e-3):
         x = init_x(self)
         for i in range(4, self.n):
@@ -159,22 +162,23 @@ class DDGP:
             if not self.is_feasible(x, i, dtol):
                 return False
         return True
-    
+
     def check_xsol(self, x, dtol=1e-3):
         for i in range(4, self.n):
             if not self.is_feasible(x, i, dtol):
                 return False
-        return True    
+        return True
+
 
 class DFS:
-    def __init__(self, D, last_node=1):
+    def __init__(self, D: DDGP, last_node=1):
         self.D = D  # este atributo deve ser do tipo DDGP
         self.n = self.D.n
         self.x = init_x(D)  # set the first four points
         self.T = np.zeros(self.n, dtype=int)
         self.T[:4] = last_node
         self.last_node = last_node
-        self.n_bt_nodes = 0 # count the number of backtracked nodes
+        self.n_bt_nodes = 0  # count the number of backtracked nodes
 
     def backtracking(self, i):
         old_i = i
@@ -203,6 +207,7 @@ class DFS:
     def bsol(self):
         return self.T
 
+
 class FBS:
     def __init__(self, D, states, p):
         self.x = init_x(D)
@@ -213,17 +218,21 @@ class FBS:
         self.D = D
         self.n = self.D.n
         self.T = [0 for i in range(self.n)]  # vector of states id
-        self.F = [0 for i in range(self.n)]  # vector of flips        
+        self.F = [0 for i in range(self.n)]  # vector of flips
         self.TLvl = 0  # level of the current state
         self.TVal = self.states[0]  # state of the current node
         self.iX = np.zeros(self.n, dtype=int)  # index of the last fixed point
         self.iX[0] = 4
-        self.n_bt_nodes = 0 # count the number of backtracks
-        self.n_infeasible = 0 # count the number of 'is_feasible' calls that return False
+        self.n_bt_nodes = 0  # count the number of backtracks
+        self.n_infeasible = (
+            0  # count the number of 'is_feasible' calls that return False
+        )
 
         # assert len(s) for s in states are descending
         for i in range(1, len(states)):
-            assert len(states[i - 1]) >= len(states[i]), f"states are not descending: {states[i - 1]} < {states[i]}"
+            assert len(states[i - 1]) >= len(
+                states[i]
+            ), f"states are not descending: {states[i - 1]} < {states[i]}"
 
     def filter_states(self):
         # ToDo Idealmente este método deve levar em consideração o
@@ -251,7 +260,7 @@ class FBS:
             k = self.T[self.TLvl - 1]
             self.iX[self.TLvl] = self.iX[self.TLvl - 1] + len(self.states[k])
         else:
-            self.iX[self.TLvl] = 4 # in the level 0, we start in the 5th vertex
+            self.iX[self.TLvl] = 4  # in the level 0, we start in the 5th vertex
         if self.iX[self.TLvl] < old_i:
             self.n_bt_nodes += old_i - self.iX[self.TLvl]
         return self.iX[self.TLvl]
@@ -261,11 +270,11 @@ class FBS:
         if self.TLvl > 0:
             k = self.T[self.TLvl - 1]
             f = self.F[self.TLvl - 1]
-            b = int(self.states[k][-1])            
+            b = int(self.states[k][-1])
             if (f == 1 and b == 1) or (f == 0 and b == 0):
                 # flip s
                 s = [1 - int(x) for x in s]
-                s = ''.join([str(x) for x in s])
+                s = "".join([str(x) for x in s])
                 self.F[self.TLvl] = 1
         return s
 
@@ -289,30 +298,30 @@ class FBS:
         return i
 
     @property
-    def bsol(self, i:int=None):
+    def bsol(self, i: int = None):
         if i is None:
             i = self.n - 1
-            
+
         b = "1111"
         for lvl in range(self.TLvl):
             s = self.states[self.T[lvl]]
             if self.F[lvl] == 1:
                 s = [1 - int(x) for x in s]
-                s = ''.join([str(x) for x in s])
+                s = "".join([str(x) for x in s])
             b += s
-        s = self.TVal[:(i - self.iX[self.TLvl] + 1)]
-        b += s 
+        s = self.TVal[: (i - self.iX[self.TLvl] + 1)]
+        b += s
         return b
 
 
 def bp(D: DDGP, TS, verbose=True):
     i = 3  # index of the last fixed vertice
     is_feasible = True
-    n_infeasible = 0 # count the number of 'is_feasible' calls that return False
-    n_constraints = 0
+    n_infeasible = 0  # count the number of 'is_feasible' calls that return False
+    n_prune_edges = 0
     for j in range(D.n):
-        n_constraints += len(D.d[j]) - 3
-    n_constraints = n_constraints / 2
+        n_prune_edges += len(D.d[j]) - 3
+    n_prune_edges = n_prune_edges / 2
     while True:
         i = TS.next(i, is_feasible)
         is_feasible = D.is_feasible(TS.x, i)
@@ -323,38 +332,10 @@ def bp(D: DDGP, TS, verbose=True):
             if verbose:
                 assert D.check_xsol(TS.x) == True
                 # assert D.check_bsol(TS.bsol) == True
-            return TS.x, n_infeasible, n_constraints
+            return TS.x, n_infeasible, n_prune_edges
 
 
-class TestSolveEQ3(unittest.TestCase):
-    def test_solveEQ3(self):
-        a = np.array([0, 0, 0])
-        b = np.array([1, 0, 0])
-        c = np.array([0, 1, 0])
-        xref = np.array([0.2, 0.3, 0.4])
-        da = norm(xref - a)
-        db = norm(xref - b)
-        dc = norm(xref - c)
-        p, w = solveEQ3(a, b, c, da, db, dc)
-
-        xpos = p + w
-        dax = norm(a - xpos)
-        dbx = norm(b - xpos)
-        dcx = norm(c - xpos)
-        self.assertAlmostEqual(dax, da, places=4)
-        self.assertAlmostEqual(dbx, db, places=4)
-        self.assertAlmostEqual(dcx, dc, places=4)
-
-        xneg = p - w
-        dax = norm(a - xneg)
-        dbx = norm(b - xneg)
-        dcx = norm(c - xneg)
-        self.assertAlmostEqual(dax, da, places=4)
-        self.assertAlmostEqual(dbx, db, places=4)
-        self.assertAlmostEqual(dcx, dc, places=4)
-
-
-def fake_DDGP(n, num_prune_edges=1, seed=0):
+def fake_DMDGP(n, num_prune_edges=1, seed=0):
     # def random seed
     np.random.seed(seed)
     xsol = np.random.rand(n, 3)
@@ -385,7 +366,7 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
 
     for i in range(4):
         d[i] = {}
-        for j in range(i+1, 4):
+        for j in range(i + 1, 4):
             d[i][j] = norm(xsol[i] - xsol[j])
 
     for i in range(4, n):
@@ -409,9 +390,56 @@ def fake_DDGP(n, num_prune_edges=1, seed=0):
     return DDGP(d, parents), xsol
 
 
+def determineT(D: DDGP, x: np.array, dtol=1e-4) -> np.array:
+    T = np.array([0] * len(x))
+    for i in range(4):
+        T[i] = 1
+    for i in range(4, len(x)):
+        ia, ib, ic = D.parents[i]
+        da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
+        A, B, C = x[ia], x[ib], x[ic]
+        p, w = solveEQ3(A, B, C, da, db, dc)
+        if norm(x[i] - (p - w)) < dtol:
+            T[i] = 0
+        elif norm(x[i] - (p + w)) < dtol:
+            T[i] = 1
+        else:
+            print("Error creating T from x!")
+            exit(0)
+    return T
+
+
+class TestSolveEQ3(unittest.TestCase):
+    def test_solveEQ3(self):
+        a = np.array([0, 0, 0])
+        b = np.array([1, 0, 0])
+        c = np.array([0, 1, 0])
+        xref = np.array([0.2, 0.3, 0.4])
+        da = norm(xref - a)
+        db = norm(xref - b)
+        dc = norm(xref - c)
+        p, w = solveEQ3(a, b, c, da, db, dc)
+
+        xpos = p + w
+        dax = norm(a - xpos)
+        dbx = norm(b - xpos)
+        dcx = norm(c - xpos)
+        self.assertAlmostEqual(dax, da, places=4)
+        self.assertAlmostEqual(dbx, db, places=4)
+        self.assertAlmostEqual(dcx, dc, places=4)
+
+        xneg = p - w
+        dax = norm(a - xneg)
+        dbx = norm(b - xneg)
+        dcx = norm(c - xneg)
+        self.assertAlmostEqual(dax, da, places=4)
+        self.assertAlmostEqual(dbx, db, places=4)
+        self.assertAlmostEqual(dcx, dc, places=4)
+
+
 class TestInitX(unittest.TestCase):
     def test_init_x(self):
-        D, _ = fake_DDGP(7)
+        D, _ = fake_DMDGP(7)
         x = init_x(D)
         self.assertAlmostEqual(norm(x[1] - x[0]), D.d[0][1], places=4)
         self.assertAlmostEqual(norm(x[2] - x[0]), D.d[0][2], places=4)
@@ -423,7 +451,7 @@ class TestInitX(unittest.TestCase):
 
 class TestDDGP(unittest.TestCase):
     def test_is_feasible(self):
-        D, xsol = fake_DDGP(7)
+        D, xsol = fake_DMDGP(7)
         self.assertTrue(D.is_feasible(xsol, 6))
 
         x = xsol.copy()
@@ -431,29 +459,9 @@ class TestDDGP(unittest.TestCase):
         self.assertFalse(D.is_feasible(x, 6))
 
 
-def determineT(D, x, dtol=1e-4):
-    T = np.array([0] * len(x))
-    for i in range(4):
-        T[i] = 1
-    for i in range(4, len(x)):
-        ia, ib, ic = D.parents[i]
-        da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
-        A, B, C = x[ia], x[ib], x[ic]
-        p, w = solveEQ3(A, B, C, da, db, dc)
-        if norm(x[i] - (p - w)) < dtol:
-            T[i] = 0
-        else:
-            if norm(x[i] - (p + w)) < dtol:
-                T[i] = 1
-            else:
-                print("Error creating T from x!")
-                exit(0)
-    return T
-
-
 class TesteDFS(unittest.TestCase):
     def test_backtracking_dfs_1(self):
-        D, _ = fake_DDGP(100)
+        D, _ = fake_DMDGP(100)
         dfs = DFS(D)
         Tsol = dfs.T.copy()
 
@@ -475,7 +483,7 @@ class TesteDFS(unittest.TestCase):
         )
 
     def test_backtracking_dfs_2(self):
-        D, _ = fake_DDGP(100)
+        D, _ = fake_DMDGP(100)
         dfs = DFS(D)
 
         end_bt, start_bt = sorted(
@@ -498,7 +506,7 @@ class TesteDFS(unittest.TestCase):
         )
 
     def test_backtracking_dfs_3(self):
-        D, _ = fake_DDGP(7)
+        D, _ = fake_DMDGP(7)
         dfs = DFS(D)
 
         dfs.T[4] = True
@@ -520,7 +528,7 @@ class TesteDFS(unittest.TestCase):
 
     # Current vertex is on the node FALSE and it is infeasible.
     def test_next_dfs_1(self):
-        D, xsol = fake_DDGP(20)
+        D, xsol = fake_DMDGP(20)
         T = determineT(D, xsol)
 
         # Testing if 'next' goes to the correct level of the BP tree.
@@ -548,7 +556,7 @@ class TesteDFS(unittest.TestCase):
 
     # Current vertex is on the node FALSE and it is feasible.
     def test_next_dfs_2(self):
-        D, xsol = fake_DDGP(20)
+        D, xsol = fake_DMDGP(20)
         T = determineT(D, xsol)
 
         # Testing if 'next' goes to the correct level of the BP tree.
@@ -576,7 +584,7 @@ class TesteDFS(unittest.TestCase):
 
     # Current vertex is on the node TRUE and it is infeasible.
     def test_next_dfs_3(self):
-        D, xsol = fake_DDGP(20)
+        D, xsol = fake_DMDGP(20)
         T = determineT(D, xsol)
 
         dfs = DFS(D)
@@ -623,7 +631,7 @@ class TesteDFS(unittest.TestCase):
 
     # Current vertex is on the node TRUE and it is feasible.
     def test_next_dfs_4(self):
-        D, xsol = fake_DDGP(20)
+        D, xsol = fake_DMDGP(20)
         T = determineT(D, xsol)
 
         dfs = DFS(D)
@@ -655,12 +663,12 @@ class TesteDFS(unittest.TestCase):
 
 class TestBP(unittest.TestCase):
     def test_bp_dfs(self):
-        D, xsol = fake_DDGP(10)
+        D, xsol = fake_DMDGP(10)
         dfs = DFS(D)
         x = bp(D, dfs)
 
     def test_bp_fbs(self):
-        D, xsol = fake_DDGP(10)
+        D, xsol = fake_DMDGP(10)
         states = [(1, 1, 1), (0, 0, 0), (1, 1, 0), (1, 1), (1, 0), (0, 0), (0, 1)]
         p = [0.7, 0.2, 0.1, 0.4, 0.3, 0.2, 0.1]
         fbs = FBS(D, states, p)
