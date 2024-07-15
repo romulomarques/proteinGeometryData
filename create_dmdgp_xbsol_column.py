@@ -4,7 +4,7 @@ import numpy as np
 from fbs.algorithms import *
 import multiprocessing as mp
 from tqdm import tqdm
-
+import pandas as pd
 
 def read_dmdgp(fn: str) -> DDGP:
     """
@@ -50,31 +50,40 @@ def get_bsol(bsol: np.array, row) -> str:
     return row_bsol
 
 
-def process_instance(fn: str):
+def read_xbsol(fn_xbsol:str) -> np.array:
+    """
+    Read the xbsol array from a CSV file.
+
+    :param fn_xbsol: str, path to the input CSV file
+    :return: np.array, the xbsol array
+    """
+    df = pd.read_csv(fn_xbsol)
+    bsol:np.ndarray = df['bsol'].values
+    
+    # flip if bsol[3] == 0
+    if bsol[3] == 0:
+        bsol = 1 - bsol
+    
+    return bsol
+
+def process_instance(fn_dmdgp: str):
     """
     Process a single DMDGP instance file.
 
     :param fn: str, path to the input pickle file
     """
-    df, dmdgp = read_dmdgp(fn)
+    df, dmdgp = read_dmdgp(fn_dmdgp)
     dfs = DFS(dmdgp)
-    x, _, _ = bp(dmdgp, dfs)
-    bsol = determineT(dmdgp, x)
-    df["bsol"] = df.apply(lambda row: get_bsol(bsol, row), axis=1)
-
-    with open(fn, "wb") as f:
-        pickle.dump(df, f)
-
-    fn_csv = os.path.join(fn.replace(".pkl", ".csv"))
-    df.to_csv(fn_csv, index=False)
-
+    
+    fn_xbsol = fn_dmdgp.replace("dmdgp", "xbsol")
+    xbsol = read_xbsol(fn_xbsol)
 
 def main():
     """
     Main function to parallelize DMDGP instance processing with a progress bar.
     """
     dmdgp_dir = "dmdgp"
-    file_list = [
+    file_dmdgp = [
         os.path.join(dmdgp_dir, fn)
         for fn in os.listdir(dmdgp_dir)
         if fn.endswith(".pkl")
@@ -85,8 +94,8 @@ def main():
     with mp.Pool(processes=num_cores) as pool:
         list(
             tqdm(
-                pool.imap(process_instance, file_list),
-                total=len(file_list),
+                pool.imap(process_instance, file_dmdgp),
+                total=len(file_dmdgp),
                 desc="Processing files",
             )
         )
