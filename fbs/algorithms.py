@@ -8,6 +8,7 @@ import unittest
 import numpy as np
 from numpy.linalg import norm, solve
 from numba import jit, njit, prange
+import time
 
 
 wd = "/home/michael/gitrepos/proteinGeometryData"
@@ -107,7 +108,7 @@ class DDGP:
         self.symmetrize_distance_matrix()
 
         # self.triang_bounds = []
-        # triangular inequalities
+        # # triangular inequalities
         # neighs = [set(d[i].keys()) for i in range(self.n)]
         # for i in range(self.n):
         #     ui = {}
@@ -147,7 +148,7 @@ class DDGP:
             # else:
             #     break
 
-        # feasibility with respect to triangular inequalities
+        # # feasibility with respect to triangular inequalities
         # for k, uik in self.triang_bounds[i]:
         #     dik = norm(xi - x[k])
         #     if dik >= uik + dtol:
@@ -319,20 +320,25 @@ def bp(D: DDGP, TS, verbose=True):
     is_feasible = True
     n_infeasible = 0  # count the number of 'is_feasible' calls that return False
     n_prune_edges = 0
+    toc = 0
     for j in range(D.n):
         n_prune_edges += len(D.d[j]) - 3
     n_prune_edges = n_prune_edges / 2
     while True:
+        tic = time.time()
         i = TS.next(i, is_feasible)
         is_feasible = D.is_feasible(TS.x, i)
         if not is_feasible:
             n_infeasible += 1
             continue
+        toc += time.time() - tic
+        if toc > 300:
+            return TS.x, n_infeasible, n_prune_edges, i, toc
         if i == (D.n - 1):
             if verbose:
                 assert D.check_xsol(TS.x) == True
                 # assert D.check_bsol(TS.bsol) == True
-            return TS.x, n_infeasible, n_prune_edges
+            return TS.x, n_infeasible, n_prune_edges, i, toc
 
 
 def fake_DMDGP(n, num_prune_edges=1, seed=0):
