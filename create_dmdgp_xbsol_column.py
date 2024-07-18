@@ -5,7 +5,10 @@ from fbs.algorithms import *
 import multiprocessing as mp
 from tqdm import tqdm
 import pandas as pd
+<<<<<<< HEAD
 
+=======
+>>>>>>> refs/remotes/origin/main
 
 def read_dmdgp(fn: str) -> DDGP:
     """
@@ -51,6 +54,7 @@ def get_bsol(bsol: np.array, row) -> str:
     return row_bsol
 
 
+<<<<<<< HEAD
 def flip_bsol(bsol, repetitions: list):
     if (bsol[3] == 0):
         bsol[3:] = 1 - bsol[3:]
@@ -130,13 +134,33 @@ def determineX(D: DDGP, repetitions: list, T: list):
 
 
 def process_instance(fn: str):
+=======
+def read_xbsol(fn_xbsol:str) -> np.array:
+    """
+    Read the xbsol array from a CSV file.
+
+    :param fn_xbsol: str, path to the input CSV file
+    :return: np.array, the xbsol array
+    """
+    df = pd.read_csv(fn_xbsol)
+    bsol:np.ndarray = df['bsol'].values
+    
+    # flip if bsol[3] == 0
+    if bsol[3] == 0:
+        bsol = 1 - bsol
+    
+    return bsol
+
+def process_instance(fn_dmdgp: str):
+>>>>>>> refs/remotes/origin/main
     """
     Process a single DMDGP instance file.
 
     :param fn: str, path to the input pickle file
     """
-    df, dmdgp = read_dmdgp(fn)
+    df, dmdgp = read_dmdgp(fn_dmdgp)
     dfs = DFS(dmdgp)
+<<<<<<< HEAD
 
     df_xbsol = pd.read_csv(os.path.join("xbsol", os.path.basename(fn).replace(".pkl", ".csv")))
     reorder = list(df_xbsol["atom_number"])
@@ -193,13 +217,18 @@ def test_single():
     
     print(f"hard_instances: {hard_instances}")
 
+=======
+    
+    fn_xbsol = fn_dmdgp.replace("dmdgp", "xbsol")
+    xbsol = read_xbsol(fn_xbsol)
+>>>>>>> refs/remotes/origin/main
 
 def main():
     """
     Main function to parallelize DMDGP instance processing with a progress bar.
     """
     dmdgp_dir = "dmdgp"
-    file_list = [
+    file_dmdgp = [
         os.path.join(dmdgp_dir, fn)
         for fn in os.listdir(dmdgp_dir)
         if fn.endswith(".pkl")
@@ -207,6 +236,7 @@ def main():
 
     # num_cores = mp.cpu_count()
 
+<<<<<<< HEAD
     # with mp.Pool(processes=num_cores) as pool:
     #     list(
     #         tqdm(
@@ -223,6 +253,29 @@ def main():
             hard_instances.append(fn)
     
     print(f"hard_instances: {len(hard_instances)}")
+=======
+    with mp.Pool(processes=num_cores) as pool:
+        list(
+            tqdm(
+                pool.imap(process_instance, file_dmdgp),
+                total=len(file_dmdgp),
+                desc="Processing files",
+            )
+        )
+
+
+def test_single():
+    """
+    Test the process_instance function on a single instance.
+    """
+    fn = "dmdgp/1a1u_model1_chainA_segment0.pkl"
+    import time
+
+    tic = time.time()
+    process_instance(fn)
+    toc = time.time()
+    print(f"Elapsed time: {toc - tic:.2f} seconds")
+>>>>>>> refs/remotes/origin/main
 
 
 if __name__ == "__main__":
