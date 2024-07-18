@@ -199,8 +199,8 @@ def get_bit(df_xbsol: pd.DataFrame, row: pd.Series) -> int:
     else:
         plane_points = df_xbsol.iloc[i - 3 : i]["x"].values
         semispace_sign = get_semispace_sign(row["x"], plane_points)
-        # duplicate atoms will have bit 1, because the semispace sign is 0
-        return int(semispace_sign >= 0)
+        # duplicate atoms will have bit 0, because the semispace sign is 0
+        return int(semispace_sign > 0)
 
 
 def get_prune_bsol(bsol: np.array, row: pd.Series) -> tuple:
