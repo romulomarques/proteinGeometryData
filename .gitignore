@@ -16,3 +16,5 @@ dmdgp/**
 prune_bsol/**
 xbsol/**
 df_prune.pkl
+dmdgp_leftmost/**
+xbsol_leftmost/**

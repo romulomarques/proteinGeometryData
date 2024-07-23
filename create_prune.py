@@ -7,7 +7,6 @@ from concurrent.futures import ProcessPoolExecutor
 
 # add, for each residue, a repetition of the CA atom at the end of the residue
 def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
-    
     def atom_score_first_residue(row: pd.Series) -> int:
         atom_score = 0
         if row["atom_name"] == "N":
@@ -17,7 +16,7 @@ def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
         elif row["atom_name"] == "C":
             atom_score = 2
         elif row["atom_name"] == "CA":
-            atom_score = 3            
+            atom_score = 3
         return atom_score
 
     df_1st_4 = df.iloc[:4].copy()
@@ -260,7 +259,7 @@ def main():
     fn_segments = [f for f in os.listdir("segment") if f.endswith(".csv")]
 
     # Process the instances in parallel
-    print("Creating DMDGP files...")
+    print("Creating prune_xbsol files...")
     with ProcessPoolExecutor() as executor:
         list(
             tqdm(
