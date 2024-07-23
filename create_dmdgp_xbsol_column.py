@@ -110,22 +110,10 @@ def check_repeated_vertex(reorder: list, index: int) -> int:
 
 
 def determineX(D: DDGP, repetitions: list, T: list):
-    # x = np.array([0, 0, 0] * len(T))
     x = init_x(D)
     T = flip_bsol(T, repetitions)
     for i in range(4, len(x)):
         calc_x(i, T[i], x, D)
-        # ia, ib, ic = D.parents[i]
-        # da, db, dc = [D.d[i][ia], D.d[i][ib], D.d[i][ic]]
-        # A, B, C = x[ia], x[ib], x[ic]
-        # p, w = solveEQ3(A, B, C, da, db, dc)
-        # if norm(x[i] - (p - w)) < dtol:
-        #     T[i] = 0
-        # elif norm(x[i] - (p + w)) < dtol:
-        #     T[i] = 1
-        # else:
-        #     print("Error creating T from x!")
-        #     exit(0)
     return x
 
 
@@ -145,6 +133,25 @@ def read_xbsol(fn_xbsol:str) -> np.array:
     
     return bsol
 
+
+def get_vertices_without_bit(bsol: list, repetitions: list, dmdgp: DDGP):
+    vertices_without_bit = []
+    for i in range(dmdgp.n):
+        if i < 4:
+            continue
+        if bsol[i] == 1:
+            bsol[i] = 0
+            x = determineX(dmdgp, repetitions, bsol)
+            is_solution = dmdgp.check_xsol(x)
+            if not is_solution:
+                bsol[i] = 1
+            else:
+                vertices_without_bit.append(i)
+    
+    return bsol, vertices_without_bit
+            
+
+
 def process_instance(fn_dmdgp: str):
     """
     Process a single DMDGP instance file.
@@ -160,33 +167,19 @@ def process_instance(fn_dmdgp: str):
     df_xbsol["is_repetition"] = df_xbsol.apply(lambda row: check_repeated_vertex(reorder, row.name), axis=1)
     df_xbsol["is_symmetry_vertex"] = df_xbsol.apply(lambda row: check_symmetry_vertex(df, df_xbsol, row), axis=1)
     
-    x, _, _, last_vertex, total_time = bp(dmdgp, dfs)
-    if last_vertex == dmdgp.n - 1:
-        bsol = determineT(dmdgp, x)
-        df["bsol"] = df.apply(lambda row: get_bsol(bsol, row), axis=1)
+    bsol = np.array(df_xbsol['b'])
+    repetitions = list(df_xbsol["is_repetition"])
 
-        # # df_xbsol = pd.read_csv(fn.replace("dmdgp", "xbsol").replace(".pkl", ".csv"))
-        # mybsol = np.array(df_xbsol['b'])
-        # mybsol[0], mybsol[1], mybsol[2] = 1, 1, 1
-        # repetitions = list(df_xbsol["is_repetition"])
-        # mybsol = flip_bsol(mybsol, repetitions)
-        # mybsol = flip_bsol_by_symmetry_vertices(mybsol, list(df_xbsol["is_symmetry_vertex"]), repetitions)
-        # my_x = determineX(dmdgp, repetitions, mybsol)
-        # is_solution = False
-        # is_solution = dmdgp.check_xsol(my_x)
-        # is_same_solution = all(bsol == mybsol)
-        # lala = 1
-        # # print(f"{fn}: {is_same_solution}")
-        
-        # # with open(fn, "wb") as f:
-        # #     pickle.dump(df, f)
+    bsol = flip_bsol(bsol, repetitions)
+    bsol = flip_bsol_by_symmetry_vertices(bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions)
+    
+    bsol, _ = get_vertices_without_bit(bsol, repetitions, dmdgp)
+    
+    # with open(fn, "wb") as f:
+    #     pickle.dump(df, f)
 
-        # # fn_csv = os.path.join(fn.replace(".pkl", ".csv"))
-        # # df.to_csv(fn_csv, index=False)
-
-        return True
-    else:
-        return False
+    # fn_csv = os.path.join(fn.replace(".pkl", ".csv"))
+    # df.to_csv(fn_csv, index=False)
 
 
 def test_single():
@@ -194,8 +187,8 @@ def test_single():
     Test the process_instance function on a single instance.
     """
     # fn = "dmdgp/1a1u_model1_chainA_segment0.pkl"
-    fn = "dmdgp/1adz_model1_chainA_segment2.pkl"
-    # fn = "dmdgp/1a11_model1_chainA_segment0.pkl"
+    # fn = "dmdgp/1adz_model1_chainA_segment2.pkl"
+    fn = "dmdgp/1a11_model1_chainA_segment0.pkl"
     import time
 
     tic = time.time()
@@ -242,19 +235,6 @@ def main():
             hard_instances.append(fn)
 
 
-def test_single():
-    """
-    Test the process_instance function on a single instance.
-    """
-    fn = "dmdgp/1a1u_model1_chainA_segment0.pkl"
-    import time
-
-    tic = time.time()
-    process_instance(fn)
-    toc = time.time()
-    print(f"Elapsed time: {toc - tic:.2f} seconds")
-
-
 if __name__ == "__main__":
-    # test_single()
-    main()
+    test_single()
+    # main()
