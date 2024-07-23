@@ -7,7 +7,6 @@ import os
 import unittest
 import numpy as np
 from numpy.linalg import norm, solve
-from numba import jit, njit, prange
 import time
 
 
