@@ -120,10 +120,36 @@ def check_symmetry_vertex(df_dmdgp: pd.DataFrame, df_xbsol: pd.DataFrame) -> np.
         i, j = row["i"], row["j"]
         if i > j:
             i, j = j, i
-        is_symmetry_vertex[(i+3):(j+1)] = 0
+        if (i+4) < j+1:
+            is_symmetry_vertex[(i+4):j+1] = 0
+
     # ensure that repeated vertices have bit 0
     is_symmetry_vertex[df_xbsol["is_repetition"] == 1] = 0
     return is_symmetry_vertex
+
+
+# def check_symmetry_vertex(df_dmdgp: pd.DataFrame, df_xbsol: pd.DataFrame, row) -> int:
+#     if row["is_repetition"]:
+#         return 0
+#     else:
+#         v = row.name
+#         vm1_atom_number = df_xbsol.iloc[v-1]["atom_number"]
+#         vm2_atom_number = df_xbsol.iloc[v-2]["atom_number"]
+#         vm3_atom_number = df_xbsol.iloc[v-3]["atom_number"]
+#         for _, row_dmdgp in df_dmdgp.iterrows():
+#             i, j = row_dmdgp["i"], row_dmdgp["j"]
+#             if i > j:
+#                 aux = i
+#                 i = j
+#                 j = aux
+#             if (i < v-3) and (j >= v):
+#                 isnot_i_vm1 = df_xbsol.iloc[i]["atom_number"] != vm1_atom_number
+#                 isnot_i_vm2 = df_xbsol.iloc[i]["atom_number"] != vm2_atom_number
+#                 isnot_i_vm3 = df_xbsol.iloc[i]["atom_number"] != vm3_atom_number
+#                 if (isnot_i_vm1) and (isnot_i_vm2) and (isnot_i_vm3):
+#                     return 0
+        
+#         return 1
 
 
 @timeit
@@ -134,15 +160,6 @@ def check_repeated_vertex(reorder: list, index: int) -> int:
             return 1
 
     return 0
-
-
-@timeit
-def determineX(D: DDGP, repetitions: list, T: list):
-    x = init_x(D)
-    T = flip_bsol(T, repetitions)
-    for i in range(4, len(x)):
-        calc_x(i, T[i], x, D)
-    return x
 
 
 @timeit
@@ -163,24 +180,69 @@ def read_xbsol(fn_xbsol: str) -> np.array:
     return bsol
 
 
+# @timeit
+# def determineX(D: DDGP, repetitions: list, T: list):
+#     x = init_x(D)
+#     T = flip_bsol(T, repetitions)
+#     for i in range(4, len(x)):
+#         calc_x(i, T[i], x, D)
+#     return x
+
+
 @timeit
-def get_vertices_without_bit(
-    bsol: list, repetitions: list, dmdgp: DDGP
-) -> Tuple[list, list]:
+def determineX(D: DDGP, T: list, x=[], start=4):
+    # immerse the first 4 vertices in R^3
+    if len(x) < 4:
+        x = init_x(D, T[3])
+
+    for i in range(start, len(x)):
+        calc_x(i, T[i], x, D)
+    return x
+
+
+# @timeit
+# def get_vertices_without_bit(
+#     bsol: list, repetitions: list, dmdgp: DDGP
+# ) -> Tuple[list, list]:
+#     vertices_without_bit = []
+#     for i in range(dmdgp.n):
+#         if i < 4:
+#             continue
+#         if bsol[i] == 1:
+#             bsol[i] = 0
+#             x = determineX(dmdgp, repetitions, bsol)
+#             is_solution = dmdgp.check_xsol(x)
+#             if not is_solution:
+#                 bsol[i] = 1
+#             else:
+#                 vertices_without_bit.append(i)
+
+#     return bsol, vertices_without_bit
+
+
+@timeit
+def get_vertices_without_bit(bsol: list, repetitions: list, dmdgp: DDGP) -> Tuple[list, list]:
     vertices_without_bit = []
+    # T = flip_bsol(T, repetitions)
+    x = determineX(dmdgp, bsol)
+    if not dmdgp.check_xsol(x):
+        return [], []
+    x_cp = x.copy()
     for i in range(dmdgp.n):
         if i < 4:
             continue
         if bsol[i] == 1:
             bsol[i] = 0
-            x = determineX(dmdgp, repetitions, bsol)
-            is_solution = dmdgp.check_xsol(x)
-            if not is_solution:
-                bsol[i] = 1
-            else:
+            determineX(dmdgp, bsol, x=x_cp, start=i)
+            is_solution = dmdgp.check_xsol(x_cp)
+            if is_solution:
+                x[i:] = x_cp[i:]
                 vertices_without_bit.append(i)
+            else:
+                x_cp[i:] = x[i:]
+                bsol[i] = 1           
 
-    return bsol, vertices_without_bit
+    return bsol, x, vertices_without_bit
 
 
 @timeit
@@ -192,27 +254,34 @@ def process_instance(fn_dmdgp: str) -> None:
     """
     df_dmdgp, dmdgp = read_dmdgp(fn_dmdgp)
 
-    df_xbsol = pd.read_csv(
-        os.path.join("xbsol", os.path.basename(fn_dmdgp).replace(".pkl", ".csv"))
-    )
+    df_xbsol = pd.read_csv(os.path.join("xbsol", os.path.basename(fn_dmdgp).replace(".pkl", ".csv")))
     reorder = list(df_xbsol["atom_number"])
 
-    df_xbsol["is_repetition"] = df_xbsol.apply(
-        lambda row: check_repeated_vertex(reorder, row.name), axis=1
-    )
+    # adding a boolean column that says if a vertex is a repetition of a original vertex or not.
+    df_xbsol["is_repetition"] = df_xbsol.apply(lambda row: check_repeated_vertex(reorder, row.name), axis=1)
 
-    df_xbsol["is_symmetry_vertex"] = check_symmetry_vertex(df_dmdgp, df_xbsol)    
+    # adding a boolean column that says if a vertex is symmetry vertex or not.
+    df_xbsol["is_symmetry_vertex"] = check_symmetry_vertex(df_dmdgp, df_xbsol)
+    # df_xbsol["is_symmetry_vertex"] = df_xbsol.apply(lambda row: check_symmetry_vertex(df_dmdgp, df_xbsol, row), axis=1)    
 
     bsol = np.array(df_xbsol["b"])
     repetitions = list(df_xbsol["is_repetition"])
 
+    # flipping the binary solution around the 4th vertex if needed.
     bsol = flip_bsol(bsol, repetitions)
-    bsol = flip_bsol_by_symmetry_vertices(
-        bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions
-    )
 
-    bsol, _ = get_vertices_without_bit(bsol, repetitions, dmdgp)
+    # flipping the binary solution around the other symmetry vertices.
+    bsol = flip_bsol_by_symmetry_vertices(bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions)
 
+    # arroz = check_symmetry_vertex_1(df_dmdgp, df_xbsol)
+    bsol, x, _ = get_vertices_without_bit(bsol, repetitions, dmdgp)
+
+    # updating the binary solution and the R^3 coordinates with the information associated with 
+    # the leftmost symmetric binary solution.
+    df_xbsol["b"] = bsol
+    df_xbsol["x"] = df_xbsol.apply(lambda row : x[row.name], axis=1)
+    
+    # updating the binary solution of each prunning edge with the leftmost symmetric binary solution
     df_dmdgp["bsol"] = df_dmdgp.apply(lambda row: get_bsol(bsol, row), axis=1)
 
     fn_dmdgp = os.path.join("dmdgp_leftmost", os.path.basename(fn_dmdgp))
@@ -221,9 +290,7 @@ def process_instance(fn_dmdgp: str) -> None:
     df_dmdgp.to_csv(fn_dmdgp.replace(".pkl", ".csv"), index=False)
 
     df_xbsol["b"] = bsol
-    fn_xbsol = os.path.join(
-        "xbsol_leftmost", os.path.basename(fn_dmdgp).replace(".pkl", ".csv")
-    )
+    fn_xbsol = os.path.join("xbsol_leftmost", os.path.basename(fn_dmdgp).replace(".pkl", ".csv"))
     df_xbsol.to_csv(fn_xbsol, index=False)
 
 
@@ -331,5 +398,5 @@ def test_profile(sample_size=20, timeit=True):
 
 if __name__ == "__main__":
     # test_single()
-    test_profile(timeit=True)
-    # main()
+    # test_profile(timeit=True)
+    main()
