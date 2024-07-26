@@ -71,7 +71,7 @@ def calc_x(i, b, x, D, debug=False):
         assert np.abs(dcx - dc) < 1e-4, "dcx=%g, dc=%g" % (dcx, dc)
 
 
-def init_x(D):
+def init_x(D, bit_4th = True):
     n = D.n
     x = np.zeros((n, 3), dtype=float)
 
@@ -92,7 +92,10 @@ def init_x(D):
     d13 = D.d[1][3]
     d23 = D.d[2][3]
     p, w = solveEQ3(x[0], x[1], x[2], d03, d13, d23)
-    x[3] = p + w
+    if bit_4th:
+        x[3] = p + w
+    else:
+        x[3] = p - w
     return x
 
 
