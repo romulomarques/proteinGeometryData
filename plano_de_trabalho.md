@@ -26,11 +26,12 @@ N1 HA1 C1 CA1 H2 N2 CA2 HA2 C2 CA2 H3 N3 CA3 HA3 C3 CA3 H4 N4 CA4 HA4 C4 CA4 H5 
 0  1   2  3   4  5  6   7   8  9'  10 11 12  13  14 15' 16 17 18  19  20 21' 22 23 24  25  26 27'
           *         *                    *                    *                    *
 
-HA-6-HA
 H-6-H
 H-9-HA
-HA-9-H
 H-12-H
+
+HA-6-HA
+HA-9-H
 HA-12-HA
 
 Esta reordem mantém a ordem de fixação da DDGP original.

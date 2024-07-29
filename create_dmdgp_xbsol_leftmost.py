@@ -33,7 +33,7 @@ def timeit(func):
     return wrapper
 
 
-@timeit
+# @timeit
 def read_dmdgp(fn: str) -> DDGP:
     """
     Read a DMDGP instance from a pickle file and convert it to a DDGP object.
@@ -63,7 +63,7 @@ def read_dmdgp(fn: str) -> DDGP:
     return df, dmdgp
 
 
-@timeit
+# @timeit
 def get_bsol(bsol: np.array, row: pd.Series) -> str:
     """
     Extract the binary solution string for a given row.
@@ -80,7 +80,7 @@ def get_bsol(bsol: np.array, row: pd.Series) -> str:
     return row_bsol
 
 
-@timeit
+# @timeit
 def flip_bsol(bsol: list, repetitions: list) -> List[int]:
     # ensure that bsol[3] == 1
     if bsol[3] == 0:
@@ -93,7 +93,7 @@ def flip_bsol(bsol: list, repetitions: list) -> List[int]:
     return bsol
 
 
-@timeit
+# @timeit
 def flip_bsol_by_symmetry_vertices(
     bsol: np.array, symmetries: list, repetitions: list
 ) -> List[int]:
@@ -113,46 +113,22 @@ def flip_bsol_by_symmetry_vertices(
 
 
 # row: row of the df_xbsol
-@timeit
+# @timeit
 def check_symmetry_vertex(df_dmdgp: pd.DataFrame, df_xbsol: pd.DataFrame) -> np.array:
     is_symmetry_vertex = np.ones(len(df_xbsol), dtype=int)
     for _, row in df_dmdgp.iterrows():
         i, j = row["i"], row["j"]
         if i > j:
             i, j = j, i
-        if (i+4) < j+1:
-            is_symmetry_vertex[(i+4):j+1] = 0
+        if (i + 4) < j + 1:
+            is_symmetry_vertex[(i + 4) : j + 1] = 0
 
     # ensure that repeated vertices have bit 0
     is_symmetry_vertex[df_xbsol["is_repetition"] == 1] = 0
     return is_symmetry_vertex
 
 
-# def check_symmetry_vertex(df_dmdgp: pd.DataFrame, df_xbsol: pd.DataFrame, row) -> int:
-#     if row["is_repetition"]:
-#         return 0
-#     else:
-#         v = row.name
-#         vm1_atom_number = df_xbsol.iloc[v-1]["atom_number"]
-#         vm2_atom_number = df_xbsol.iloc[v-2]["atom_number"]
-#         vm3_atom_number = df_xbsol.iloc[v-3]["atom_number"]
-#         for _, row_dmdgp in df_dmdgp.iterrows():
-#             i, j = row_dmdgp["i"], row_dmdgp["j"]
-#             if i > j:
-#                 aux = i
-#                 i = j
-#                 j = aux
-#             if (i < v-3) and (j >= v):
-#                 isnot_i_vm1 = df_xbsol.iloc[i]["atom_number"] != vm1_atom_number
-#                 isnot_i_vm2 = df_xbsol.iloc[i]["atom_number"] != vm2_atom_number
-#                 isnot_i_vm3 = df_xbsol.iloc[i]["atom_number"] != vm3_atom_number
-#                 if (isnot_i_vm1) and (isnot_i_vm2) and (isnot_i_vm3):
-#                     return 0
-        
-#         return 1
-
-
-@timeit
+# @timeit
 def check_repeated_vertex(reorder: list, index: int) -> int:
     current_atom_number = reorder[index]
     for i in range(index - 1, -1, -1):
@@ -162,7 +138,7 @@ def check_repeated_vertex(reorder: list, index: int) -> int:
     return 0
 
 
-@timeit
+# @timeit
 def read_xbsol(fn_xbsol: str) -> np.array:
     """
     Read the xbsol array from a CSV file.
@@ -181,15 +157,6 @@ def read_xbsol(fn_xbsol: str) -> np.array:
 
 
 # @timeit
-# def determineX(D: DDGP, repetitions: list, T: list):
-#     x = init_x(D)
-#     T = flip_bsol(T, repetitions)
-#     for i in range(4, len(x)):
-#         calc_x(i, T[i], x, D)
-#     return x
-
-
-@timeit
 def determineX(D: DDGP, T: list, x=[], start=4):
     # immerse the first 4 vertices in R^3
     if len(x) < 4:
@@ -201,27 +168,9 @@ def determineX(D: DDGP, T: list, x=[], start=4):
 
 
 # @timeit
-# def get_vertices_without_bit(
-#     bsol: list, repetitions: list, dmdgp: DDGP
-# ) -> Tuple[list, list]:
-#     vertices_without_bit = []
-#     for i in range(dmdgp.n):
-#         if i < 4:
-#             continue
-#         if bsol[i] == 1:
-#             bsol[i] = 0
-#             x = determineX(dmdgp, repetitions, bsol)
-#             is_solution = dmdgp.check_xsol(x)
-#             if not is_solution:
-#                 bsol[i] = 1
-#             else:
-#                 vertices_without_bit.append(i)
-
-#     return bsol, vertices_without_bit
-
-
-@timeit
-def get_vertices_without_bit(bsol: list, repetitions: list, dmdgp: DDGP) -> Tuple[list, list]:
+def get_vertices_without_bit(
+    bsol: list, repetitions: list, dmdgp: DDGP
+) -> Tuple[list, list]:
     vertices_without_bit = []
     # T = flip_bsol(T, repetitions)
     x = determineX(dmdgp, bsol)
@@ -240,12 +189,12 @@ def get_vertices_without_bit(bsol: list, repetitions: list, dmdgp: DDGP) -> Tupl
                 vertices_without_bit.append(i)
             else:
                 x_cp[i:] = x[i:]
-                bsol[i] = 1           
+                bsol[i] = 1
 
     return bsol, x, vertices_without_bit
 
 
-@timeit
+# @timeit
 def process_instance(fn_dmdgp: str) -> None:
     """
     Process a single DMDGP instance file.
@@ -254,15 +203,19 @@ def process_instance(fn_dmdgp: str) -> None:
     """
     df_dmdgp, dmdgp = read_dmdgp(fn_dmdgp)
 
-    df_xbsol = pd.read_csv(os.path.join("xbsol", os.path.basename(fn_dmdgp).replace(".pkl", ".csv")))
+    df_xbsol = pd.read_csv(
+        os.path.join("xbsol", os.path.basename(fn_dmdgp).replace(".pkl", ".csv"))
+    )
     reorder = list(df_xbsol["atom_number"])
 
     # adding a boolean column that says if a vertex is a repetition of a original vertex or not.
-    df_xbsol["is_repetition"] = df_xbsol.apply(lambda row: check_repeated_vertex(reorder, row.name), axis=1)
+    df_xbsol["is_repetition"] = df_xbsol.apply(
+        lambda row: check_repeated_vertex(reorder, row.name), axis=1
+    )
 
     # adding a boolean column that says if a vertex is symmetry vertex or not.
     df_xbsol["is_symmetry_vertex"] = check_symmetry_vertex(df_dmdgp, df_xbsol)
-    # df_xbsol["is_symmetry_vertex"] = df_xbsol.apply(lambda row: check_symmetry_vertex(df_dmdgp, df_xbsol, row), axis=1)    
+    # df_xbsol["is_symmetry_vertex"] = df_xbsol.apply(lambda row: check_symmetry_vertex(df_dmdgp, df_xbsol, row), axis=1)
 
     bsol = np.array(df_xbsol["b"])
     repetitions = list(df_xbsol["is_repetition"])
@@ -271,16 +224,18 @@ def process_instance(fn_dmdgp: str) -> None:
     bsol = flip_bsol(bsol, repetitions)
 
     # flipping the binary solution around the other symmetry vertices.
-    bsol = flip_bsol_by_symmetry_vertices(bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions)
+    bsol = flip_bsol_by_symmetry_vertices(
+        bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions
+    )
 
     # arroz = check_symmetry_vertex_1(df_dmdgp, df_xbsol)
     bsol, x, _ = get_vertices_without_bit(bsol, repetitions, dmdgp)
 
-    # updating the binary solution and the R^3 coordinates with the information associated with 
+    # updating the binary solution and the R^3 coordinates with the information associated with
     # the leftmost symmetric binary solution.
     df_xbsol["b"] = bsol
-    df_xbsol["x"] = df_xbsol.apply(lambda row : x[row.name], axis=1)
-    
+    df_xbsol["x"] = df_xbsol.apply(lambda row: x[row.name], axis=1)
+
     # updating the binary solution of each prunning edge with the leftmost symmetric binary solution
     df_dmdgp["bsol"] = df_dmdgp.apply(lambda row: get_bsol(bsol, row), axis=1)
 
@@ -290,7 +245,9 @@ def process_instance(fn_dmdgp: str) -> None:
     df_dmdgp.to_csv(fn_dmdgp.replace(".pkl", ".csv"), index=False)
 
     df_xbsol["b"] = bsol
-    fn_xbsol = os.path.join("xbsol_leftmost", os.path.basename(fn_dmdgp).replace(".pkl", ".csv"))
+    fn_xbsol = os.path.join(
+        "xbsol_leftmost", os.path.basename(fn_dmdgp).replace(".pkl", ".csv")
+    )
     df_xbsol.to_csv(fn_xbsol, index=False)
 
 
@@ -331,7 +288,7 @@ def main():
 
     num_cores = os.cpu_count()
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(max_workers=num_cores) as executor:
         list(
             tqdm(
                 executor.map(process_instance, dmdgp_files),
@@ -353,22 +310,35 @@ def test_profile(sample_size=20, timeit=True):
 
     for fn in sorted(dmdgp_files):
         process_instance(fn)
-    
+
     if not timeit:
         return
-    
+
     # Collect profiling results
     profiling_data = []
-    for func in [read_dmdgp, get_bsol, flip_bsol, flip_bsol_by_symmetry_vertices, check_symmetry_vertex, check_repeated_vertex, determineX, read_xbsol, get_vertices_without_bit, process_instance]:
+    for func in [
+        read_dmdgp,
+        get_bsol,
+        flip_bsol,
+        flip_bsol_by_symmetry_vertices,
+        check_symmetry_vertex,
+        check_repeated_vertex,
+        determineX,
+        read_xbsol,
+        get_vertices_without_bit,
+        process_instance,
+    ]:
         total_time = func.total_time
         num_calls = func.call_count
-        avg_time = sum(func.times) / len(func.times) if func.times else float('nan')
-        profiling_data.append({
-            'Function': func.__name__,
-            'Total Time (s)': total_time,
-            'Number of Calls': num_calls,
-            'Average Time (s)': avg_time
-        })
+        avg_time = sum(func.times) / len(func.times) if func.times else float("nan")
+        profiling_data.append(
+            {
+                "Function": func.__name__,
+                "Total Time (s)": total_time,
+                "Number of Calls": num_calls,
+                "Average Time (s)": avg_time,
+            }
+        )
 
     # Create a DataFrame
     df_profiling = pd.DataFrame(profiling_data)
@@ -378,22 +348,23 @@ def test_profile(sample_size=20, timeit=True):
 
     # Plot total time
     plt.subplot(3, 1, 1)
-    sns.barplot(x='Total Time (s)', y='Function', data=df_profiling, palette='viridis')
-    plt.title('Total Time per Function')
+    sns.barplot(x="Total Time (s)", y="Function", data=df_profiling, palette="viridis")
+    plt.title("Total Time per Function")
 
     # Plot number of calls
     plt.subplot(3, 1, 2)
-    sns.barplot(x='Number of Calls', y='Function', data=df_profiling, palette='viridis')
-    plt.title('Number of Calls per Function')
+    sns.barplot(x="Number of Calls", y="Function", data=df_profiling, palette="viridis")
+    plt.title("Number of Calls per Function")
 
     # Plot average time
     plt.subplot(3, 1, 3)
-    sns.barplot(x='Average Time (s)', y='Function', data=df_profiling, palette='viridis')
-    plt.title('Average Time per Function')
+    sns.barplot(
+        x="Average Time (s)", y="Function", data=df_profiling, palette="viridis"
+    )
+    plt.title("Average Time per Function")
 
     plt.tight_layout()
     plt.show()
-
 
 
 if __name__ == "__main__":
