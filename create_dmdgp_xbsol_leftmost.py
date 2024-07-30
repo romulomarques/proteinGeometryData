@@ -275,29 +275,6 @@ def test_single():
     # xbsol = read_xbsol(fn_xbsol)
 
 
-def main():
-    """
-    Main function to parallelize DMDGP instance processing with a progress bar.
-    """
-    dmdgp_dir = "dmdgp"
-    dmdgp_files = [
-        os.path.join(dmdgp_dir, fn)
-        for fn in os.listdir(dmdgp_dir)
-        if fn.endswith(".pkl")
-    ]
-
-    num_cores = os.cpu_count()
-
-    with ProcessPoolExecutor(max_workers=num_cores) as executor:
-        list(
-            tqdm(
-                executor.map(process_instance, dmdgp_files),
-                total=len(dmdgp_files),
-                desc="Processing files",
-            )
-        )
-
-
 def test_profile(sample_size=20, timeit=True):
     dmdgp_dir = "dmdgp"
     dmdgp_files = [
@@ -367,7 +344,49 @@ def test_profile(sample_size=20, timeit=True):
     plt.show()
 
 
+def test_check_if_BPsolution_is_leftmost(sample_size=20):
+    xbsol_leftmost_dir = "xbsol_leftmost"
+    fnames = os.listdir(xbsol_leftmost_dir)
+    fnsizes = sorted([(fn, os.path.getsize(os.path.join(xbsol_leftmost_dir, fn))) for fn in fnames], key=lambda x : x[1])
+    
+    sample = fnsizes[:sample_size]
+    end_sample = sample_size
+    for i in range(sample_size, -1, -1):
+        # get the xbsol_leftmost files that have about 100 atoms.
+        if sample[i][1] > 6000:
+            end_sample = i
+        else:
+            break
+    
+    sample = sample[:end_sample]
+
+
+
+def main():
+    """
+    Main function to parallelize DMDGP instance processing with a progress bar.
+    """
+    dmdgp_dir = "dmdgp"
+    dmdgp_files = [
+        os.path.join(dmdgp_dir, fn)
+        for fn in os.listdir(dmdgp_dir)
+        if fn.endswith(".pkl")
+    ]
+
+    num_cores = os.cpu_count()
+
+    with ProcessPoolExecutor(max_workers=num_cores) as executor:
+        list(
+            tqdm(
+                executor.map(process_instance, dmdgp_files),
+                total=len(dmdgp_files),
+                desc="Processing files",
+            )
+        )
+
+
 if __name__ == "__main__":
     # test_single()
     # test_profile(timeit=True)
-    main()
+    test_check_if_BPsolution_is_leftmost()
+    # main()
