@@ -1,7 +1,9 @@
+import os
 import time
 import numpy as np
 from numpy.linalg import norm
 from typing import List, Tuple, Dict
+from tqdm import tqdm
 
 DATA = {
     "ddgp": {
@@ -96,7 +98,7 @@ def calc_pw(
         w (np.ndarray): Vector perpendicular to the plane
     """
     # get the first three items in D[i]
-    ia, ib, ic = list(D[i].keys())[:3]
+    ia, ib, ic = i - 3, i - 2, i - 1
     da, db, dc = D[i][ia], D[i][ib], D[i][ic]
 
     A, B, C = x[ia], x[ib], x[ic]
@@ -139,7 +141,7 @@ def is_feasible(
     return True
 
 
-def init_x(D: Dict[int, Dict[int, float]]) -> np.ndarray:
+def init_xb(D: Dict[int, Dict[int, float]]) -> np.ndarray:
     """
     Initialize the first four points of the system.
 
@@ -149,7 +151,12 @@ def init_x(D: Dict[int, Dict[int, float]]) -> np.ndarray:
     Returns:
     np.ndarray: Array of initialized point positions
     """
-    n = len(D)
+    vertices = set()
+    for i in D:
+        vertices.add(i)
+        for j in D[i]:
+            vertices.add(j)
+    n = max(vertices) + 1
     x = np.zeros((n, 3), dtype=float)
 
     # Set x1 along x-axis
@@ -171,14 +178,17 @@ def init_x(D: Dict[int, Dict[int, float]]) -> np.ndarray:
     p, w = solveEQ3(x[0], x[1], x[2], d03, d13, d23)
     x[3] = p + w
 
-    return x
+    b = np.zeros(n, dtype=int)
+    b[:4] = 1
+
+    return x, b
 
 
 def bp(
     D: Dict[int, Dict[int, float]],  # distance matrix
     i: int = 0,  # current index
     x: np.ndarray = None,  # current point positions
-    b: List[bool] = None,  # choice of solution for each point,
+    b: List[int] = None,  # choice of solution for each point,
     single_solution: bool = False,  # flag to stop after finding a single solution
     finished: bool = False,  # flag to stop the recursion
 ):
@@ -196,36 +206,42 @@ def bp(
     Returns:
     None: The function updates x in-place and prints when a solution is found
     """
-    if finished:
-        return
 
-    if i == 0:
-        n = len(D)
-        x = init_x(D)
-        b = np.zeros(n, dtype=bool)
+    if x is None:
+        x, b = init_xb(D)
         i = 4
 
-    if i == len(D):
+    if i == len(x):
         # Set DATA
         DATA["bp"]["x"].append(x.copy())
         DATA["bp"]["b"].append(b.copy())
         if single_solution:
             finished = True
-        return
+        return x, b, finished
 
     p, w = calc_pw(i, x, D)
 
     # Try positive direction
-    x[i] = p + w
+    x[i] = p - w
     b[i] = 0
-    if is_feasible(D, i, x):
-        bp(D, i + 1, x, b)
+    if is_feasible(D, i, x) and i > 3:
+        x, b, finished = bp(
+            D, i + 1, x, b, single_solution=single_solution, finished=finished
+        )
+        if finished:
+            return x, b, finished
 
     # Try negative direction
-    x[i] = p - w
+    x[i] = p + w
     b[i] = 1
     if is_feasible(D, i, x):
-        bp(D, i + 1, x, b)
+        x, b, finished = bp(
+            D, i + 1, x, b, single_solution=single_solution, finished=finished
+        )
+        if finished:
+            return x, b, finished
+
+    return x, b, finished
 
 
 def test_simple(n: int = 10, p: float = 0.5, seed: int = 42):
@@ -271,12 +287,62 @@ def reset_data():
     DATA["bp"]["b"] = list()
 
 
-def test_random_batch(n:int=10, p:float=0.5):
+def test_random_batch(n: int = 10, p: float = 0.5):
     for seed in range(30):
         print("\n")
         reset_data()
         test_simple(n, p, seed)
 
 
-def process_instance(fn:str):
-    
+def process_instance(fn_xbsol: str):
+    import pandas as pd
+    import pickle as pkl
+
+    fn_dmdgp = fn_xbsol.replace("xbsol", "dmdgp").replace(".csv", ".pkl")
+    with open(fn_dmdgp, "rb") as f:
+        df_dmdgp = pkl.load(f)
+
+    # Extract the distance matrix
+    n = 0
+    D = dict()
+    for _, row in df_dmdgp.iterrows():
+        i, j = row["i"], row["j"]
+        # Ensure i < j
+        if i < j:
+            i, j = j, i
+        if i not in D:
+            D[i] = dict()
+        D[i][j] = row["dij"]
+        n = max(n, i, j)
+    n += 1
+
+    x, b, _ = bp(D, single_solution=True)
+
+    df_xbsol = pd.read_csv(fn_xbsol)
+
+    b_ref = df_xbsol["b"].values
+
+    matching_result = np.equal(b[3:], b_ref[3:]).all()
+    if not matching_result:
+        print(f"Failed to match the solution for {fn_xbsol}")
+    return matching_result
+
+
+def test_xbsol_leftmost(sample_size: int = 10):
+    xbsol_leftmost_dir = "xbsol_leftmost"
+    fnames = os.listdir(xbsol_leftmost_dir)
+    fnames_sizes = sorted(
+        [(fn, os.path.getsize(os.path.join(xbsol_leftmost_dir, fn))) for fn in fnames],
+        key=lambda x: x[1],
+    )
+
+    fmatchings = []
+    for fname, fsize in tqdm(fnames_sizes[:sample_size], desc="Processing instances"):
+        fn_xbsol = os.path.join(xbsol_leftmost_dir, fname)
+        matching_result = process_instance(fn_xbsol)
+        fmatchings.append(matching_result)
+
+
+if __name__ == "__main__":
+    process_instance("dmdgp/1qfr_model1_chainA_segment8.csv")
+    # test_xbsol_leftmost(100)

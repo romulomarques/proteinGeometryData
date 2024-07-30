@@ -344,24 +344,6 @@ def test_profile(sample_size=20, timeit=True):
     plt.show()
 
 
-def test_check_if_BPsolution_is_leftmost(sample_size=20):
-    xbsol_leftmost_dir = "xbsol_leftmost"
-    fnames = os.listdir(xbsol_leftmost_dir)
-    fnsizes = sorted([(fn, os.path.getsize(os.path.join(xbsol_leftmost_dir, fn))) for fn in fnames], key=lambda x : x[1])
-    
-    sample = fnsizes[:sample_size]
-    end_sample = sample_size
-    for i in range(sample_size, -1, -1):
-        # get the xbsol_leftmost files that have about 100 atoms.
-        if sample[i][1] > 6000:
-            end_sample = i
-        else:
-            break
-    
-    sample = sample[:end_sample]
-
-
-
 def main():
     """
     Main function to parallelize DMDGP instance processing with a progress bar.
