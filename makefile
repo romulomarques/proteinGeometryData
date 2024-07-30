@@ -36,6 +36,9 @@ $(TARGET): $(OBJS)
 debug: CFLAGS := $(CFLAGS) $(DEBUG_FLAGS)
 debug: clean $(TARGET)
 
+run: all
+	./$(TARGET) dmdgp/1a11_model1_chainA_segment0.csv -v
+
 # Rule for cleaning up generated files
 clean:
 	rm -f $(OBJS) $(TARGET)

@@ -231,7 +231,7 @@ int compare_nd(const void *a, const void *b) {
     }
 }
 
-void read_distance_matrix(const char *filename, DistanceMatrix *D) {
+void read_distance_matrix(const char *filename, DistanceMatrix *D, bool verbose) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         perror("Error opening file");
@@ -247,8 +247,8 @@ void read_distance_matrix(const char *filename, DistanceMatrix *D) {
         }
     }
 
-    int i, j;
-    double dij;
+    int i = 0, j = 0;
+    double dij = 0;
     D->num_points = 0;
 
     char line[256];
@@ -296,6 +296,10 @@ void read_distance_matrix(const char *filename, DistanceMatrix *D) {
     // sort all neighbors, using a library function
     for (int i = 0; i < D->num_points; i++) {
         qsort(D->nd[i], D->num_neighbors[i], sizeof(NeighborDistance), compare_nd);
+    }
+
+    if(verbose){
+        printf("Number of points: %d\n", D->num_points);        
     }
 
     // check if the parents are correct
@@ -417,21 +421,43 @@ void run_bp(DistanceMatrix *D, bool single_solution, char* filename, bool verbos
     }
 }
 
-int main() {
+void read_option_bool(int argc, char *argv[], char *option, bool *value, bool default_value) {
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], option) == 0) {
+            *value = true;
+        }
+    }
+    *value = default_value;
+}
+
+int main(int argc, char *argv[]) {
     DistanceMatrix D;
     char filename[256];
-    strcpy(filename, "dmdgp/1qfr_model1_chainA_segment8.csv");
-    read_distance_matrix(filename, &D);
+    bool verbose = false;
+    
+    // Parse the input filename    
+    if(argc > 1){
+        strcpy(filename, argv[1]);
+    } else {
+        strcpy(filename, "dmdgp/1qfr_model1_chainA_segment8.csv");
+    }
+    
+    read_option_bool(argc, argv, "-v", &verbose, false);
+
+    // Read the distance matrix from the input file
+    read_distance_matrix(filename, &D, verbose);
 
     // Print the distance matrix for verification
-    for (int i = 0; i < D.num_points; i++) {
-        for (int j = 0; j < D.num_neighbors[i]; j++) {
-            printf("%d %d %f\n", i, D.nd[i][j].neighbor, D.nd[i][j].distance);
+    if(verbose){
+        for (int i = 0; i < D.num_points; i++) {
+            for (int j = 0; j < D.num_neighbors[i]; j++) {
+                printf("%d %d %f\n", i, D.nd[i][j].neighbor, D.nd[i][j].distance);
+            }
+            printf("\n");
         }
-        printf("\n");
     }
 
-    run_bp(&D, true, filename, true);
+    run_bp(&D, true, filename, verbose);
 
     return EXIT_SUCCESS;
 }
