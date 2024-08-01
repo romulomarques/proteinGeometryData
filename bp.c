@@ -234,6 +234,8 @@ int compare_nd(const void *a, const void *b) {
 void read_distance_matrix(const char *filename, DistanceMatrix *D, bool verbose) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
+        // Print error message and exit if file cannot be opened
+        fprintf(stderr, "Error opening file: %s\n", filename);
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
@@ -390,6 +392,7 @@ void save_solution(const int num_points, const double x[MAX_POINTS][3], const in
     FILE *file = fopen(output_filename, "w");
 
     if (file == NULL) {
+        fprintf(stderr, "Error opening file: %s\n", output_filename);
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
