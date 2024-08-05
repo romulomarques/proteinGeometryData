@@ -5,6 +5,7 @@
 #include <math.h>
 #include <cblas.h>
 #include <lapacke.h>
+#include <unistd.h>
 
 #define MAX_POINTS 1000 // Adjust as needed
 #define MAX_NEIGHBORS 20 // Adjust as needed
@@ -234,6 +235,8 @@ int compare_nd(const void *a, const void *b) {
 void read_distance_matrix(const char *filename, DistanceMatrix *D, bool verbose) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
+        // Print error message and exit if file cannot be opened
+        fprintf(stderr, "Error opening file: %s\n", filename);
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
@@ -367,8 +370,7 @@ bool bp(DistanceMatrix *D, int i, double x[MAX_POINTS][3], int b[MAX_POINTS],
     return false;
 }
 
-void save_solution(const int num_points, const double x[MAX_POINTS][3], const int b[MAX_POINTS], char* filename, bool verbose) {
-    // replace "dmdgp" by "xbsol_leftmost"
+void set_output_filename(char *filename, char *output_filename) {
     char *prefix = "xbsol_leftmost";
     char *basename = strrchr(filename, '/');
     if (basename == NULL) {
@@ -377,11 +379,12 @@ void save_solution(const int num_points, const double x[MAX_POINTS][3], const in
         basename++;
     }
 
-    char output_filename[256];
     strcpy(output_filename, prefix);
     strcat(output_filename, "/");
-    strcat(output_filename, basename);    
+    strcat(output_filename, basename);
+}
 
+void save_solution(const int num_points, const double x[MAX_POINTS][3], const int b[MAX_POINTS], char* output_filename, bool verbose) {
     if( verbose )
     {
         printf("Solution saved to %s\n", output_filename);
@@ -390,6 +393,7 @@ void save_solution(const int num_points, const double x[MAX_POINTS][3], const in
     FILE *file = fopen(output_filename, "w");
 
     if (file == NULL) {
+        fprintf(stderr, "Error opening file: %s\n", output_filename);
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
@@ -411,11 +415,20 @@ void run_bp(DistanceMatrix *D, bool single_solution, char* filename, bool verbos
     int b[MAX_POINTS];
     bool finished = false;
 
+    char output_filename[256];
+    set_output_filename(filename, output_filename);
+
+    // skip if the solution already exists
+    if( access(output_filename, F_OK) != -1 ){
+        if(verbose) printf("Solution already exists: %s\n", output_filename);        
+        return;
+    }
+
     init_xb(D, x, b);
     bp(D, 4, x, b, single_solution, &finished, verbose);
 
     if (finished) {
-        save_solution(D->num_points, x, b, filename, verbose);
+        save_solution(D->num_points, x, b, output_filename, verbose);
     } else {
         printf("No solution found\n");
     }
@@ -425,6 +438,7 @@ void read_option_bool(int argc, char *argv[], char *option, bool *value, bool de
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], option) == 0) {
             *value = true;
+            return;
         }
     }
     *value = default_value;
