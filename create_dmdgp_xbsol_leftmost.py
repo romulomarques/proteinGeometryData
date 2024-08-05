@@ -195,46 +195,19 @@ def get_vertices_without_bit(
 
 
 # @timeit
-def process_instance(fn_dmdgp: str) -> None:
+def process_instance(fn_xbsol_leftmost: str) -> None:
     """
-    Process a single DMDGP instance file.
+    Process a single xbsol_leftmost instance file.
 
-    :param fn: str, path to the input pickle file
+    :param fn: str, path to the input csv file
     """
-    df_dmdgp, dmdgp = read_dmdgp(fn_dmdgp)
-
-    df_xbsol = pd.read_csv(
-        os.path.join("xbsol", os.path.basename(fn_dmdgp).replace(".pkl", ".csv"))
-    )
-    reorder = list(df_xbsol["atom_number"])
-
-    # adding a boolean column that says if a vertex is a repetition of a original vertex or not.
-    df_xbsol["is_repetition"] = df_xbsol.apply(
-        lambda row: check_repeated_vertex(reorder, row.name), axis=1
-    )
-
-    # adding a boolean column that says if a vertex is symmetry vertex or not.
-    df_xbsol["is_symmetry_vertex"] = check_symmetry_vertex(df_dmdgp, df_xbsol)
-    # df_xbsol["is_symmetry_vertex"] = df_xbsol.apply(lambda row: check_symmetry_vertex(df_dmdgp, df_xbsol, row), axis=1)
-
-    bsol = np.array(df_xbsol["b"])
-    repetitions = list(df_xbsol["is_repetition"])
-
-    # flipping the binary solution around the 4th vertex if needed.
-    bsol = flip_bsol(bsol, repetitions)
-
-    # flipping the binary solution around the other symmetry vertices.
-    bsol = flip_bsol_by_symmetry_vertices(
-        bsol, list(df_xbsol["is_symmetry_vertex"]), repetitions
-    )
-
-    # arroz = check_symmetry_vertex_1(df_dmdgp, df_xbsol)
-    bsol, x, _ = get_vertices_without_bit(bsol, repetitions, dmdgp)
-
-    # updating the binary solution and the R^3 coordinates with the information associated with
-    # the leftmost symmetric binary solution.
-    df_xbsol["b"] = bsol
-    df_xbsol["x"] = df_xbsol.apply(lambda row: x[row.name], axis=1)
+    df_xbsol_leftmost = pd.read_csv(fn_xbsol_leftmost)
+    
+    fn_dmdgp = os.path.join("dmdgp", os.path.basename(fn_xbsol_leftmost).replace(".csv", ".pkl"))
+    with open(fn_dmdgp, "rb") as f:
+        df_dmdgp = pickle.load(f)
+    
+    bsol = np.array(df_xbsol_leftmost["b"])
 
     # updating the binary solution of each prunning edge with the leftmost symmetric binary solution
     df_dmdgp["bsol"] = df_dmdgp.apply(lambda row: get_bsol(bsol, row), axis=1)
@@ -244,35 +217,20 @@ def process_instance(fn_dmdgp: str) -> None:
         pickle.dump(df_dmdgp, f)
     df_dmdgp.to_csv(fn_dmdgp.replace(".pkl", ".csv"), index=False)
 
-    df_xbsol["b"] = bsol
-    fn_xbsol = os.path.join(
-        "xbsol_leftmost", os.path.basename(fn_dmdgp).replace(".pkl", ".csv")
-    )
-    df_xbsol.to_csv(fn_xbsol, index=False)
-
 
 def test_single():
     """
     Test the process_instance function on a single instance.
     """
-    # fn = "dmdgp/1a1u_model1_chainA_segment0.pkl"
-    # fn = "dmdgp/1adz_model1_chainA_segment2.pkl"
-    fn = "dmdgp/1a11_model1_chainA_segment0.pkl"
+    # fn = "xbsol_leftmost/1a1u_model1_chainA_segment0.csv"
+    # fn = "xbsol_leftmost/1adz_model1_chainA_segment2.csv"
+    fn = "xbsol_leftmost/1a11_model1_chainA_segment0.csv"
     import time
 
     tic = time.time()
     solved = process_instance(fn)
     toc = time.time()
     print(f"Elapsed time: {toc - tic:.2f} seconds")
-
-    # hard_instances = []
-    # if not solved:
-    #     hard_instances.append(fn)
-
-    # print(f"hard_instances: {hard_instances}")
-
-    # fn_xbsol = fn.replace("dmdgp", "xbsol")
-    # xbsol = read_xbsol(fn_xbsol)
 
 
 def test_profile(sample_size=20, timeit=True):
@@ -348,11 +306,10 @@ def main():
     """
     Main function to parallelize DMDGP instance processing with a progress bar.
     """
-    dmdgp_dir = "dmdgp"
-    dmdgp_files = [
-        os.path.join(dmdgp_dir, fn)
-        for fn in os.listdir(dmdgp_dir)
-        if fn.endswith(".pkl")
+    xbsol_leftmost_dir = "xbsol_leftmost"
+    xbsol_leftmost_files = [
+        os.path.join(xbsol_leftmost_dir, fn)
+        for fn in os.listdir(xbsol_leftmost_dir)
     ]
 
     num_cores = os.cpu_count()
@@ -360,8 +317,8 @@ def main():
     with ProcessPoolExecutor(max_workers=num_cores) as executor:
         list(
             tqdm(
-                executor.map(process_instance, dmdgp_files),
-                total=len(dmdgp_files),
+                executor.map(process_instance, xbsol_leftmost_files),
+                total=len(xbsol_leftmost_files),
                 desc="Processing files",
             )
         )
@@ -370,5 +327,4 @@ def main():
 if __name__ == "__main__":
     # test_single()
     # test_profile(timeit=True)
-    test_check_if_BPsolution_is_leftmost()
-    # main()
+    main()
