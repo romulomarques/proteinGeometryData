@@ -3,6 +3,8 @@ import subprocess
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+os.makedirs("xbsol_leftmost", exist_ok=True)
+
 def call_app(file_path):
     try:
         result = subprocess.run(['./bp.exe', file_path], timeout=60, capture_output=True, text=True)
