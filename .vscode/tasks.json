@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build debug",
+            "label": "build bp.exe",
             "type": "shell",
             "command": "make debug",
             "group": {
@@ -13,6 +13,23 @@
             },
             "problemMatcher": ["$gcc"],
             "detail": "Build the project with debug flags"
+        },
+        {
+            "label": "build sbbu.exe",
+            "type": "shell",
+            "command": "make", 
+            "args": [
+                "sbbu/sbbu.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/sbbu"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Generated task by debugging setup."
         }        
     ]
 }

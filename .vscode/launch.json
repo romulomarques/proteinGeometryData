@@ -26,6 +26,31 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "Debug C++ Program",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/sbbu/sbbu",
+            "args": [
+                "-nmr", "dmdgp/9pcy_model1_chainA_segment0.csv",
+                "-tmax", "300"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "internalConsoleOptions": "openOnSessionStart"
         }
     ]
 }

@@ -21,3 +21,6 @@ xbsol_leftmost/**
 bp.exe
 bp.o
 prompt_content.json
+df_dmdgp_leftmost.pkl
+sbbu/RESULTS/test_2020_02_14_DMAX_50.log
+sbbu/RESULTS/test_2020_02_14_DMAX_60.log
