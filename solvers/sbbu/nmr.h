@@ -17,8 +17,14 @@ class nmr_t
 {
 public:
 	nmr_t() {}
+
+    nmr_t(std::string fnmr, double dtol, bool is_csv)
+    {
+        if(is_csv) read_csv(fnmr, dtol);
+        else read_nmr(fnmr, dtol);
+    }
 		
-    nmr_t(std::string fnmr, double dtol)
+    void read_nmr(std::string fnmr, double dtol)
     {
         m_fnmr = fnmr;
 		m_dtol = dtol;
@@ -88,7 +94,7 @@ public:
         }
     }
 
-    nmr_t(std::string fcsv, double dtol, int arroz)
+    void read_csv(std::string fcsv, double dtol)
     {
         m_fnmr = fcsv;
 		m_dtol = dtol;
@@ -107,7 +113,12 @@ public:
         m_nedges = m_nnodes = 0;
 
         // the first line of the csv file contains the names of the columns and must be ignored
-        fscanf(fid, "%*[^\n]\n");
+        int nreads = fscanf(fid, "%*[^\n]\n");
+        if(nreads == EOF)
+        {
+            printf("%s::%d The file %s is empty.\n", __FILE__, __LINE__, fcsv.c_str());
+            exit(EXIT_FAILURE);
+        }
         
         // count nodes and edges.
         while (EOF != fscanf(fid, "%d,%d,%[^,],%[^,],%d,%d,%lf,%*[^\n]\n", &i, &j, iatom, jatom, &iresnumber, &jresnumber, &l))
@@ -123,7 +134,12 @@ public:
         rewind(fid); // back to file begin
 
         // the first line of the csv file contains the names of the columns and must be ignored
-        fscanf(fid, "%*[^\n]\n");
+        nreads = fscanf(fid, "%*[^\n]\n");
+        if(nreads == EOF)
+        {
+            printf("%s::%d The file %s is empty.\n", __FILE__, __LINE__, fcsv.c_str());
+            exit(EXIT_FAILURE);
+        }
         
         m_edges = (edge_t*)malloc(m_nedges * sizeof(edge_t));
 

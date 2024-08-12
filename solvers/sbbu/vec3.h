@@ -62,3 +62,8 @@ inline void vec3_cross(double *u, const double *x, const double *y)
     u[1] = x[2] * y[0] - x[0] * y[2];
     u[2] = x[0] * y[1] - x[1] * y[0];
 }
+
+inline void vec3_copy(double *u, const double *x)
+{
+    vec3_set(u, x[0], x[1], x[2]);
+}

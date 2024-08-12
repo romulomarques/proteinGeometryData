@@ -6,30 +6,40 @@
         {
             "label": "build bp.exe",
             "type": "shell",
-            "command": "make debug",
+            "command": "make",
+            "args": [
+                "bp.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/solvers/bp"
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$gcc"],
-            "detail": "Build the project with debug flags"
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver bp.exe with debug flags"
         },
         {
             "label": "build sbbu.exe",
             "type": "shell",
-            "command": "make", 
+            "command": "make",
             "args": [
-                "sbbu/sbbu.exe"
+                "sbbu.exe"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/sbbu"
+                "cwd": "${workspaceFolder}/solvers/sbbu"
             },
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$gcc"],
-            "detail": "Generated task by debugging setup."
-        }        
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver sbbu.exe with debug flags"
+        }
     ]
 }

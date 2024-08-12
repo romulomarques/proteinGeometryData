@@ -27,5 +27,5 @@ struct edge_t{
     int m_j;
     double m_l;
     double m_u;
-    char m_type[9] = {}; // string in the format "i_atom_name j-i j_atom_name"
+    char m_type[9] = {}; // string in the format "i_atom_type j-i j_atom_type" (e.g. "CA 1 H")
 };

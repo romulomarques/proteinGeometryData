@@ -11,7 +11,6 @@ import functools
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-os.makedirs("xbsol_leftmost", exist_ok=True)
 os.makedirs("dmdgp_leftmost", exist_ok=True)
 
 
@@ -202,11 +201,13 @@ def process_instance(fn_xbsol_leftmost: str) -> None:
     :param fn: str, path to the input csv file
     """
     df_xbsol_leftmost = pd.read_csv(fn_xbsol_leftmost)
-    
-    fn_dmdgp = os.path.join("dmdgp", os.path.basename(fn_xbsol_leftmost).replace(".csv", ".pkl"))
+
+    fn_dmdgp = os.path.join(
+        "dmdgp", os.path.basename(fn_xbsol_leftmost).replace(".csv", ".pkl")
+    )
     with open(fn_dmdgp, "rb") as f:
         df_dmdgp = pickle.load(f)
-    
+
     bsol = np.array(df_xbsol_leftmost["b"])
 
     # updating the binary solution of each prunning edge with the leftmost symmetric binary solution
@@ -308,8 +309,7 @@ def main():
     """
     xbsol_leftmost_dir = "xbsol_leftmost"
     xbsol_leftmost_files = [
-        os.path.join(xbsol_leftmost_dir, fn)
-        for fn in os.listdir(xbsol_leftmost_dir)
+        os.path.join(xbsol_leftmost_dir, fn) for fn in os.listdir(xbsol_leftmost_dir)
     ]
 
     num_cores = os.cpu_count()

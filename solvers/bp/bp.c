@@ -66,6 +66,31 @@ void solveEQ3(const double a[3], const double b[3], const double c[3], const dou
     const double dtol = 1e-3;
     int ipiv[2];
 
+    // trivial case
+    if( da == 0 ){
+        // p = a
+        cblas_dcopy(3, a, 1, p, 1);
+        // w = zeros(3, 1)
+        cblas_dscal(3, 0, w, 1);
+        return;
+    }
+
+    if( db == 0 ){
+        // p = b
+        cblas_dcopy(3, b, 1, p, 1);
+        // w = zeros(3, 1)
+        cblas_dscal(3, 0, w, 1);
+        return;
+    }
+
+    if( dc == 0 ){
+        // p = c
+        cblas_dcopy(3, c, 1, p, 1);
+        // w = zeros(3, 1)
+        cblas_dscal(3, 0, w, 1);
+        return;
+    }
+
     // Calculate u = b - a and v = c - a
     cblas_dcopy(3, b, 1, u, 1);
     cblas_daxpy(3, -1.0, a, 1, u, 1);

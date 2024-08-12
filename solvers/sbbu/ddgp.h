@@ -78,7 +78,6 @@ public:
      */
     double lde(const double *x)
     {
-        int n = 0; // number of terms
         double emax = 0; // lde value        
         for (int i = 0; i < m_nnodes; ++i)
             for (int k = m_i[i]; k < m_i[i + 1]; ++k)
