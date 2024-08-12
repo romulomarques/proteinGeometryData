@@ -88,9 +88,8 @@ public:
    inline void reflect( bool* f, int n, double *xj)
    {      
       // reset x[j,:]
-      xj[ 0 ] = m_y[ 0 ];
-      xj[ 1 ] = m_y[ 1 ];
-      xj[ 2 ] = m_y[ 2 ];
+      vec3_copy( xj, m_y );
+      
       // apply from last to first
       for ( int k = n - 1; k >= 0; --k )
          if ( f[ k ] )
