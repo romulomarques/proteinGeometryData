@@ -26,6 +26,11 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define SQR(a) ((a) * (a))
+#define SWAP(a, b) do { \
+    auto temp = a; \
+    a = b; \
+    b = temp; \
+} while (0)
 
 class options_t
 {

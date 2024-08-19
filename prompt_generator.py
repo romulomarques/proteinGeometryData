@@ -18,23 +18,12 @@ def copy_to_clipboard(content: str):
 
 def main():
     sources = [
-        "bp.c",
-        # "bp.py",
-        "makefile",
+        "/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/makefile",        
         # ".vscode/launch.json",
         # ".vscode/tasks.json",
     ]
 
-    prompt = """
-    (.conda) (base) michael@DESKTOP-EJP6FG0:~/github/rs_ROMULO$ make debug 
-rm -f bp.o bp.exe
-gcc -Wall -Wextra -std=c11 -O2 -g -O0 -c bp.c -o bp.o
-bp.c: In function ‘read_distance_matrix’:
-bp.c:245:26: warning: use of assignment suppression and length modifier together in gnu_scanf format [-Wformat=]
-  245 |         if (sscanf(line, "%d,%d,%*[^,],%*[^,],%*d,%*d,%lf,%*lf", &i, &j, &dij) == 3) {
-      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-gcc -Wall -Wextra -std=c11 -O2 -g -O0 -o bp.exe bp.o -lblas -llapack -llapacke -lm
-    """
+    prompt = """Pls, check and, if needed, improve this makefile."""
 
     # prompt = """
     # The DeviceConfig objects should not have url_data and url_api equal, because it duplicates the data sent to our server. Pls, to fix this, write a script that checks if they are the same and change the url_data to 'api_dummy' as defined in the urls.py. Also, (a) change the DeviceConfig.url_data default value and (b) add a validation process to avoid it to happen again.

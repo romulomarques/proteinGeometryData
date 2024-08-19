@@ -32,3 +32,4 @@ sbbu/RESULTS/DATA_EPSD_00_DMAX_50.log
 sbbu/RESULTS/DATA_EPSD_00_DMAX_60.csv
 sbbu/RESULTS/DATA_EPSD_00_DMAX_60.log
 
+solvers/sbbu/sbbu_dbg.exe

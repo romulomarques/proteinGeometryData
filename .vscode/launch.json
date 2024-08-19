@@ -28,13 +28,13 @@
             ]
         },
         {
-            "name": "Debug C++ Program",
+            "name": "(gdb) sbbu_dbg.exe",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/sbbu/sbbu",
+            "program": "${workspaceFolder}/solvers/sbbu/sbbu_dbg.exe",
             "args": [
                 "-nmr", "dmdgp/9pcy_model1_chainA_segment0.csv",
-                "-tmax", "300"
+                "-tmax", "3600"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -48,7 +48,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "build sbbu_dbg.exe",
             "miDebuggerPath": "/usr/bin/gdb",
             "internalConsoleOptions": "openOnSessionStart"
         }

@@ -40,6 +40,25 @@
                 "$gcc"
             ],
             "detail": "Build the solver sbbu.exe with debug flags"
+        },
+        {
+            "label": "build sbbu_dbg.exe",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "sbbu_dbg.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/solvers/sbbu"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver sbbu.exe with debug flags"
         }
     ]
 }

@@ -345,7 +345,7 @@ public:
    {
       char fsol[ FILENAME_MAX ];
       strcpy( fsol, fname.c_str() );
-      char* p = strstr( fsol, ".nmr" ); // returns a pointer to the first occurrence of ".nmr"
+      char* p = strstr( fsol, ".csv" ); // returns a pointer to the first occurrence of ".nmr"
       sprintf( p, "_sbbu.sol" );        // replace suffix
 
       printf( "SBBU: saving solution on %s\n", fsol );
@@ -376,11 +376,6 @@ public:
             // update the best solution
             for ( int i = 0; i <= kmax; ++i )
                m_fopt[ i ] = m_f[ i ];
-
-#ifdef DEBUG
-            double toc = omp_get_wtime() - tic;
-            printf( "\ttoc = %g secs, emin = %g\n", toc, emin );
-#endif
             break;
          }
 
@@ -411,13 +406,24 @@ public:
       // init x[k,:], for k in edge.i, edge.i+1, ..., m_j[m_j[edge.i]]
       int r = find_root( edge.m_i + 3 );
       int j = find_root( edge.m_j );
-      // TODO check if the current edge is really solved
       if ( r == j ) // already solved
+      {
+         // calculate the distance between x[i] and x[j]
+         double* xi = &m_x[ 3 * edge.m_i ];
+         double* xj = &m_x[ 3 * edge.m_j ];
+         double eij = vec3_dist( xi, xj ) - edge.m_l;
+         if ( fabs( eij ) > m_dtol )
+         {
+            char msg[ 256 ];
+            snprintf( msg, sizeof( msg ), "The edge (%d, %d, %f) could not be solved (emin=%g).\n",
+                edge.m_i + 1, edge.m_j + 1, edge.m_l, eij );
+            throw std::runtime_error( msg );
+         }
          return;
+      }
 
       init_x( edge.m_j );
-      cluster_t& cr = m_c[ r ];
-      cluster_t& cj = m_c[ j ];
+      cluster_t& cr = m_c[ r ];      
 
       // create d :: vector of decisions
       m_n = 0; // number of decisions to be taken
@@ -441,11 +447,6 @@ public:
       cr.create_planes( edge.m_j, m_d, m_n );
 
       // searching      
-#ifdef DEBUG
-      double tic = omp_get_wtime();
-      printf( "solving edge i=%d j=%d l=%g u=%g kmax=%d\n",
-          edge.m_i, edge.m_j, edge.m_l, edge.m_u, kmax );
-#endif
       double eij = dfs_traverse( edge, cr );
 
       // reflect all nodes from edge.i to edge.j
@@ -473,13 +474,13 @@ public:
          solve_edge( m_edges[ k ] );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
-      }
+      }      
       double toc = omp_get_wtime() - tic;
       printf( "SBBU: solution found after %g secs\n", toc );
 
       init_x( m_nnodes - 1 );
       m_dgp.assert_feasibility( m_x );
 
-      printf( "BP: MDE = %g, LDE = %g\n", m_dgp.mde( m_x ), m_dgp.lde( m_x ) );
+      printf( "SBBU: MDE = %g, LDE = %g\n", m_dgp.mde( m_x ), m_dgp.lde( m_x ) );
    }
 };
