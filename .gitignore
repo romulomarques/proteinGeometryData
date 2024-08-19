@@ -22,5 +22,13 @@ bp.exe
 bp.o
 prompt_content.json
 df_dmdgp_leftmost.pkl
+sbbu.exe
 sbbu/RESULTS/test_2020_02_14_DMAX_50.log
 sbbu/RESULTS/test_2020_02_14_DMAX_60.log
+sbbu/DATA_EPSD_00_DMAX_50/**
+sbbu/DATA_EPSD_00_DMAX_60/**
+sbbu/RESULTS/DATA_EPSD_00_DMAX_50.csv
+sbbu/RESULTS/DATA_EPSD_00_DMAX_50.log
+sbbu/RESULTS/DATA_EPSD_00_DMAX_60.csv
+sbbu/RESULTS/DATA_EPSD_00_DMAX_60.log
+

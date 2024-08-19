@@ -411,6 +411,7 @@ public:
       // init x[k,:], for k in edge.i, edge.i+1, ..., m_j[m_j[edge.i]]
       int r = find_root( edge.m_i + 3 );
       int j = find_root( edge.m_j );
+      // TODO check if the current edge is really solved
       if ( r == j ) // already solved
          return;
 
@@ -448,7 +449,7 @@ public:
       double eij = dfs_traverse( edge, cr );
 
       // reflect all nodes from edge.i to edge.j
-      cr.reflect_all( m_d, m_fopt, m_n );
+      cr.reflect_all( m_d, m_fopt, m_n, m_j );
       
       if ( eij > m_dtol ) // edges of range 4 allways have two solutions
       {
