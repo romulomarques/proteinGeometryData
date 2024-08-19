@@ -289,30 +289,7 @@ public:
          edge_t& edge = m_dgp.m_edges[ k ];
          if ( edge.m_j - edge.m_i > 3 )
             m_edges[ m_nedges++ ] = edge;
-      }
-
-      // sort by j
-      // auto cmp_edges = [](const void *x, const void *y) { return ((edge_t *)x)->m_j - ((edge_t *)y)->m_j; };
-      // sort by j and edge length
-      auto cmp_edges = []( const void* x, const void* y ) {
-         // j is different
-         auto dj = ( (edge_t*)x )->m_j - ( (edge_t*)y )->m_j;
-         if ( dj )
-            return dj;
-
-         // j is equal return the edge with small length
-         auto dx = ( (edge_t*)x )->m_j - ( (edge_t*)x )->m_i;
-         auto dy = ( (edge_t*)y )->m_j - ( (edge_t*)y )->m_i;
-         return dx - dy;
-      };
-      qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
-
-#ifdef DEBUG
-      // print edges
-      printf( "Edges (sorted):\n" );
-      for ( auto k = 0; k < m_nedges; ++k )
-         printf( "  edge\t%d\t%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j );
-#endif
+      }      
    }
 
    // Returns the (index) root associated to the vertex i cluster.
@@ -461,12 +438,40 @@ public:
       }
    }
 
-   void solve( double tmax )
+   void sort_edges_default()
+   {
+      // edge a, edge b
+      // a < b, if a.j < b.j or (a.j == b.j and a.i > b.i)
+      auto cmp_edges = []( const void* x, const void* y ) {
+         // j is different
+         auto dj = ( (edge_t*)x )->m_j - ( (edge_t*)y )->m_j;
+         if ( dj ) return dj;
+
+         // j is equal return the edge with small length
+         auto dx = ( (edge_t*)x )->m_j - ( (edge_t*)x )->m_i;
+         auto dy = ( (edge_t*)y )->m_j - ( (edge_t*)y )->m_i;
+         return dx - dy;
+      };
+
+      qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
+   }
+
+   void sort_edges( const std::string& order )
+   {
+      if ( order == "default" )
+         sort_edges_default();
+      else
+         throw std::invalid_argument( "Invalid order (" + order + ")" );
+   }
+
+   void solve( double tmax, const std::string& order )
    {
       printf( "SBBU: tmax = %g\n", tmax );
       printf( "SBBU: dtol = %g\n", m_dtol );
       printf( "SBBU: imax = %g\n", (double)m_imax );
       printf( "SBBU: prune_edges = %d\n", m_nedges );
+
+      sort_edges( order );
 
       double tic = omp_get_wtime();
       for ( int k = 0; k < m_nedges; ++k )
