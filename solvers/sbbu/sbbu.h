@@ -343,17 +343,20 @@ public:
       double eij = 0.0;
       int niters = 0;
 
+      double eij_min = m_dtol;
+      
       for ( int k = kmax, count = 0; count < m_imax; ++count )
       {
          eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
 
          // solution found
-         if ( eij < m_dtol )
+         if ( eij < eij_min )
          {
+            eij_min = eij;
             // update the best solution
             for ( int i = 0; i <= kmax; ++i )
                m_fopt[ i ] = m_f[ i ];
-            break;
+            // break;
          }
 
          if ( k == kmax ) // backtrack
@@ -365,12 +368,14 @@ public:
             m_f[ k ] = true;
          }
          else
+         {
             ++k;
+         }
          cr.reflect( m_f, m_n, xj ); // updates x
          ++niters;
       }
 
-      return eij;
+      return eij_min;
    }
 
    double fbs_traverse(){
@@ -456,12 +461,16 @@ public:
       qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
    }
 
-   void sort_edges( const std::string& order )
+   void sort_edges( const std::string& order, const bool verbose = false )
    {
       if ( order == "default" )
          sort_edges_default();
       else
          throw std::invalid_argument( "Invalid order (" + order + ")" );
+
+      if( verbose )
+         for ( int k = 0; k < m_nedges; ++k )
+            m_edges[ k ].show();
    }
 
    void solve( double tmax, const std::string& order )
@@ -471,7 +480,7 @@ public:
       printf( "SBBU: imax = %g\n", (double)m_imax );
       printf( "SBBU: prune_edges = %d\n", m_nedges );
 
-      sort_edges( order );
+      sort_edges( order, true );
 
       double tic = omp_get_wtime();
       for ( int k = 0; k < m_nedges; ++k )

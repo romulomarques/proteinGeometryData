@@ -21,7 +21,7 @@ public:
 
    void show() const
    {
-      printf( "(%d, %d, %g, %g)\n", m_i, m_j, m_l, m_u );
+      printf( "(%d, %d, %g, %g, %s)\n", m_i, m_j, m_l, m_u, m_type );
    }
 
    int m_i;

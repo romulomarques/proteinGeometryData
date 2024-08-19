@@ -3,7 +3,7 @@ CXX := g++
 
 # Source files
 SRCS := sbbu.cpp
-HEADERS := sbbu.h nmr.h vec3.h ddgp.h
+HEADERS := sbbu.h nmr.h vec3.h ddgp.h edge.h
 
 # Compiler flags
 CXXFLAGS_DEBUG := -Wall -Wextra -g -O0 -DDEBUG
