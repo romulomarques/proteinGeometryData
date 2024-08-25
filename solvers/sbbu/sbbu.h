@@ -461,6 +461,154 @@ public:
       qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
    }
 
+   void sort_edges_customized(const void* x, const void* y, void (*set_order_indexes)())
+   {
+      set_order_indexes();
+      auto cmp_edges = []( const void* x, const void* y ) {
+         return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
+      };
+      qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
+   }
+
+   void set_order_indexes_prioritizing_HX_9_HX_distances()
+   {
+      sort_edges_default();
+      
+      auto get_atom_name_j_from_edge_ij = [](char* atom_type, const edge_t& this_edge){
+         const char* edge_type = this_edge.m_type;
+         int n_et = strlen(edge_type);
+         
+         if ( n_et >= 2 )
+         {
+            int end_an = 2;
+
+            atom_type[0] = edge_type[n_et - 2];
+            atom_type[1] = edge_type[n_et - 1];
+
+            // the atom name has only 1 character
+            if ( atom_type[0] == ' ' )
+            {
+               atom_type[0] = atom_type[1];
+               end_an = 1;
+            }
+            
+            // guaranteeing the atom name has at most 2 characters
+            if ( strlen(atom_type) >= 3 )
+               atom_type[end_an] = '\0';
+         } 
+      };
+
+      
+      // set the position of a edge type 'edge_type' in the new order.
+      // i_order: the in-contruction-order index of the next edge to be visited;
+      // v: the rightmost vertex of all visited edges;
+      // atom_type: the atom type of the vertex 'v';
+      // i_rm: the index of the rightmost visited edge;
+      // n == len(m_edges).
+      auto set_edge_position = [this](int& i_order, int& v, char* atom_type, int& i_rm, int n, char* edge_type)
+      {
+         edge_t* this_edge;
+
+         int diff_ij = 0;
+         char j_at[3];
+         sscanf(edge_type, "%*s %d %s", &diff_ij, &j_at);
+         for(int i = i_rm + 1; i < n; i++)
+         {
+            this_edge = &m_edges[i];
+
+            if ( (this_edge->m_i == v) && (strcmp(this_edge->m_type, edge_type) == 0) )
+            {
+               this_edge->m_order = i_order;
+               ++i_order;
+               v = this_edge->m_j;
+               strcpy(atom_type, j_at);
+               i_rm = i;
+               return true;
+            }
+            else
+            {
+               if (this_edge->m_j > v + diff_ij)
+                  break;
+            }
+         }
+         return false;
+      };
+      
+      // sets the next group of edges prioritizing to start with a edge "HA 9 H" as
+      // the next independent edge.
+      // i_order: the in-contruction-order index of the next edge to be visited;
+      // v: the rightmost vertex of all visited edges;
+      // atom_type: the atom type of the vertex 'v';
+      // i_rm: the index of the rightmost visited edge;
+      // n == len(m_edges).
+      auto next_HA_edge = [this, set_edge_position](int& i_order, int& v, char* atom_type, int& i_rm, int n){
+         const edge_t* edge_rm = &m_edges[i_rm];
+         
+         // getting the atom name from the edge type
+         // char atom_type[3];
+         // get_atom_name_j_from_edge_ij(atom_type, *edge_rm);
+
+         // we try to add the next edges only if the current rightmost vertex is a 'HA'
+         if ( strcmp(atom_type, "HA") == 0 )
+         {
+            // bool is_edge_found = false;
+            // int this_i_rm = i_rm;
+            // edge_t* this_edge;
+            // for(int i = i_rm + 1; i < n; i++)
+            // {
+            //    this_edge = &m_edges[i];
+
+            //    if ( (this_edge->m_i == v) && (strcmp(this_edge->m_type, "HA 9 H") == 0) )
+            //    {
+            //       this_edge->m_order = i_order;
+            //       ++i_order;
+            //       v = this_edge->m_j;
+            //       strcpy(atom_type, "H");
+            //       this_i_rm = i;
+            //       is_edge_found = true;
+            //       break;
+            //    }
+            //    else
+            //    {
+            //       if (this_edge->m_j > v+9)
+            //          break;
+            //    }
+            // }
+            // int this_i_rm = i_rm;
+            char next_edge_type[9];
+            strcpy(next_edge_type, "HA 9 H");
+            bool solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
+            printf("arroz\n");
+            // i_rm = this_i_rm;
+         }
+
+         return 0;
+      };
+
+      int my_i_order = 1;
+      int my_v = 1;
+      char my_atom_type[3];
+      my_atom_type[0] = 'H';
+      my_atom_type[1] = 'A';
+      my_atom_type[2] = '\0';
+      int my_i_rm = -1;
+      int my_n = m_nedges;
+      next_HA_edge(my_i_order, my_v, my_atom_type, my_i_rm, my_n);
+
+      // // sets the next group of edges prioritizing to start with a edge "H 9 HA" as
+      // // the next independent edge.
+      // auto next_H_edge = [](int i, char* atom_name, int n){
+      //    return 0;
+      // };
+      
+      // auto next_independent_edge = [](int i, char* atom_name, int n_edges){
+      //    int k = -1;
+      //    //k = next_HA_edge();
+         
+      //    return 0;
+      // };
+   }
+
    void sort_edges( const std::string& order, const bool verbose = false )
    {
       if ( order == "default" )

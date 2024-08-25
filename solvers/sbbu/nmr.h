@@ -158,7 +158,7 @@ public:
          // setting the edge type
          diff_ji = j - i;
          sprintf( edge_type, "%s %d %s", iatom, diff_ji, jatom );
-         printf( "%s\n", edge_type );
+         // printf( "%s\n", edge_type );
 
          // add (i, j)
          m_edges[ k ].m_i = i;
