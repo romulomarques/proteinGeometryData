@@ -18,12 +18,14 @@ def copy_to_clipboard(content: str):
 
 def main():
     sources = [
-        "/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/makefile",        
+        # "/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/makefile",
+        "/home/michael/github/rs_ROMULO/solvers/sbbu/edge.h",
+        "/home/michael/github/rs_ROMULO/solvers/sbbu/sbbu.h",
         # ".vscode/launch.json",
         # ".vscode/tasks.json",
     ]
 
-    prompt = """Pls, check and, if needed, improve this makefile."""
+    prompt = """Pls, convert the set_order_indexes_prioritizing_HX_9_HX_distances function to python."""
 
     # prompt = """
     # The DeviceConfig objects should not have url_data and url_api equal, because it duplicates the data sent to our server. Pls, to fix this, write a script that checks if they are the same and change the url_data to 'api_dummy' as defined in the urls.py. Also, (a) change the DeviceConfig.url_data default value and (b) add a validation process to avoid it to happen again.

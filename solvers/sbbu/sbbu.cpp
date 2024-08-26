@@ -14,16 +14,14 @@ int main(int argc, char *argv[])
     double tmax = options.read_param("-tmax", 10);
     double dtol = options.read_param("-dtol", 1e-3);
     int imax = options.read_param("-imax", 1E9);
-    std::string order = options.read_param("-order", "default");
 
     // instances to test:
     //  -> dmdgp/9pcy_model1_chainA_segment0.csv
     //  -> dmdgp/1a11_model1_chainA_segment0.csv
     
     ddgp_t dgp(fname, dtol);
-    sbbu_t sbbu(dgp, dtol, imax);
-    sbbu.set_order_indexes_prioritizing_HX_9_HX_distances();
-    // sbbu.solve(tmax, order);
+    sbbu_t sbbu(dgp, dtol, imax);    
+    sbbu.solve(tmax);
     // sbbu.save(fname);
     return EXIT_SUCCESS;
 }

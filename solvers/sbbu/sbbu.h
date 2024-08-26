@@ -14,7 +14,7 @@ public:
    double* m_c2; // vector of squared distances to x[i-3]
    ddgp_t* m_dgp;
    int m_i;
-   int m_j;
+   int m_j; // index of the node whose distance must be calculated to the i-th node
    int m_nnodes;
    double m_dtol;
    double m_y[ 3 ];
@@ -104,7 +104,7 @@ public:
       // apply from last to first
       for ( int k = n - 1; k >= 0; --k )
          if ( f[ k ] )
-            for ( int i = d[ k ]; i <= m_j; ++i )
+            for ( int i = d[ k ]; i <= j; ++i )
                mirror( k, &m_x[ 3 * i ] );
    }
 
@@ -201,8 +201,10 @@ public:
    {
       // forward to set x
       for ( int i = m_j + 1; i <= j; ++i )
-         fwd_x( i );
-      m_j = j;
+         fwd_x( i );      
+      
+      if( j > m_j )
+         m_j = j;      
    }
 
    // Set m_x[i] given points A, B, C and their distances a2, b2, c2.
@@ -378,6 +380,24 @@ public:
       return eij_min;
    }
 
+   void assert_partial_feasibility( int edge_id )
+   {
+      for ( int k = 0; k <= edge_id; ++k )
+      {
+         edge_t& edge = m_edges[ k ];
+         double* xi = &m_x[ 3 * edge.m_i ];
+         double* xj = &m_x[ 3 * edge.m_j ];
+         double eij = vec3_dist( xi, xj ) - edge.m_l;
+         if ( fabs( eij ) > m_dtol )
+         {
+            char msg[ 256 ];
+            snprintf( msg, sizeof( msg ), "The edge (%d, %d, %f) is not feasible (emin=%g).\n",
+                edge.m_i, edge.m_j, edge.m_l, eij );
+            throw std::runtime_error( msg );
+         }
+      }      
+   }
+
    double fbs_traverse(){
       double eij = 0.0;
       return eij;
@@ -398,7 +418,7 @@ public:
          {
             char msg[ 256 ];
             snprintf( msg, sizeof( msg ), "The edge (%d, %d, %f) could not be solved (emin=%g).\n",
-                edge.m_i + 1, edge.m_j + 1, edge.m_l, eij );
+                edge.m_i, edge.m_j, edge.m_l, eij );
             throw std::runtime_error( msg );
          }
          return;
@@ -428,19 +448,18 @@ public:
       }
       cr.create_planes( edge.m_j, m_d, m_n );
 
-      // searching      
+      // searching
       double eij = dfs_traverse( edge, cr );
-
-      // reflect all nodes from edge.i to edge.j
-      cr.reflect_all( m_d, m_fopt, m_n, m_j );
-      
       if ( eij > m_dtol ) // edges of range 4 allways have two solutions
       {
          char msg[ 256 ];
          snprintf( msg, sizeof( msg ), "The edge (%d, %d, %f) could not be solved (emin=%g, len(m_d)=%d).\n",
-             edge.m_i + 1, edge.m_j + 1, edge.m_l, eij, m_n );
+             edge.m_i, edge.m_j, edge.m_l, eij, m_n );
          throw std::runtime_error( msg );
       }
+
+      // reflect all nodes from edge.i to edge.j
+      cr.reflect_all( m_d, m_fopt, m_n, m_j );
    }
 
    void sort_edges_default()
@@ -461,270 +480,34 @@ public:
       qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
    }
 
-   void sort_edges_customized(const void* x, const void* y, void (*set_order_indexes)())
+   void sort_edges_by_order()
    {
-      set_order_indexes();
       auto cmp_edges = []( const void* x, const void* y ) {
          return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
       };
       qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
-   }
+   }   
 
-   void set_order_indexes_prioritizing_HX_9_HX_distances()
-   {  
-      
-      // set the position in the new order of each unvisited edge between a previous 'pos_a'-th edge 
-      // and the current 'i_rm'-th edge as 'i_order, i_order + 1, ... '
-      // i_order: the in-contruction-order index of the next edge to be visited;
-      // v: the rightmost vertex of all visited edges;
-      // i_rm: the index of the rightmost visited edge;
-      auto fill_edge_order = [this](int& i_order, int& v, int pos_a, int& i_rm)
-      {
-         for(int i = pos_a + 1; i < i_rm; i++)
-         {
-            edge_t* this_edge = &m_edges[i];
-            if (this_edge->m_order < 1)
-            {
-               this_edge->m_order = i_order;
-               ++i_order;
-            }
-         }
-
-         int n = m_nedges;
-         int i = i_rm + 1;
-         while( (m_edges[i].m_j <= v) && (i < n) )
-         {
-            edge_t* this_edge = &m_edges[i];
-            if (this_edge->m_order < 1)
-            {
-               this_edge->m_order = i_order;
-               ++i_order;
-               i_rm = i;
-            }
-            ++i;
-         }
-      };
-      
-      // set the position of a edge type 'edge_type' in the new order.
-      // i_order: the in-contruction-order index of the next edge to be visited;
-      // v: the rightmost vertex of all visited edges;
-      // atom_type: the atom type of the vertex 'v';
-      // i_rm: the index of the rightmost visited edge;
-      // n == len(m_edges).
-      auto set_edge_position = [this](int& i_order, int& v, char* atom_type, int& i_rm, int n, char* edge_type)
-      {
-         edge_t* this_edge;
-
-         int diff_ij = 0;
-         char j_at[3];
-         sscanf(edge_type, "%*s %d %s", &diff_ij, &j_at);
-         for(int i = i_rm + 1; i < n; i++)
-         {
-            this_edge = &m_edges[i];
-
-            if ( (this_edge->m_i == v) && (strcmp(this_edge->m_type, edge_type) == 0) )
-            {
-               this_edge->m_order = i_order;
-               ++i_order;
-               v = this_edge->m_j;
-               strcpy(atom_type, j_at);
-               i_rm = i;
-               return true;
-            }
-            else
-            {
-               if (this_edge->m_j > v + diff_ij)
-                  break;
-            }
-         }
-         return false;
-      };
-      
-      // set the next group of edges prioritizing to start with a edge "HA 9 H" as
-      // the next independent edge.
-      // i_order: the in-contruction-order index of the next edge to be visited;
-      // v: the rightmost vertex of all visited edges;
-      // atom_type: the atom type of the vertex 'v';
-      // i_rm: the index of the rightmost visited edge;
-      // n == len(m_edges).
-      auto next_HA_edge = [this, set_edge_position, fill_edge_order](int& i_order, int& v, char* atom_type, int& i_rm, int n){
-         const edge_t* edge_rm = &m_edges[i_rm];
-         bool solved = false;
-
-         // auxiliary copies of the parameters
-         int k_order = i_order;
-         int u = v;
-         char u_atom_type[9];
-         strcpy(u_atom_type, atom_type);
-         int k_rm = i_rm;
-         int previous_i_rm = i_rm;
-
-         // LEVEL 1: add the next independent edge as the next edge "HA 9 H"
-         char next_edge_type[9];
-         if ( strcmp(atom_type, "HA") == 0 )
-         {
-            strcpy(next_edge_type, "HA 9 H"); 
-            solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
-
-            if ( solved ) fill_edge_order(i_order, v, previous_i_rm, i_rm);
-
-            // LEVEL 2: add the next independent edge as the next edge "H 9 HA"
-            if ( ! solved )
-            {
-               u = v + 3; // the next 'H' atom
-               strcpy(u_atom_type, "H"); // atom type of 'u'
-
-               // checking if the edge 'H 9 HA' exists
-               strcpy(next_edge_type, "H 9 HA");
-               solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
-
-               // before adding the edge 'H 9 HA', we need to add the edge inner edge 'C 4 CA'
-               if ( solved )
-               {
-                  u = v + 1; // the next 'C' atom
-                  strcpy(u_atom_type, "C"); // atom type of 'u'
-
-                  // restoring the values of the auxiliary variables
-                  k_order = i_order;
-                  k_rm = i_rm;
-
-                  strcpy(next_edge_type, "C 4 CA");
-                  solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
-
-                  // add 'H 9 HA'
-                  if ( solved )
-                  {
-                     // considering the addition of the edge 'C 4 CA'
-                     i_order = k_order;
-
-                     fill_edge_order(i_order, u, previous_i_rm, k_rm);
-
-                     v = v + 3; // the first 'H' atom after the initial 'HA' passed in 'v'
-                     strcpy(atom_type, "H"); // atom type of 'u'
-
-                     strcpy(next_edge_type, "H 9 HA");
-                     solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
-
-                     fill_edge_order(i_order, v, previous_i_rm, i_rm);
-                  }
-               }
-               // LEVEL 3: add the next independent edge as the next edge "HA 6 HA"
-               else 
-               {
-                  strcpy(next_edge_type, "HA 6 HA");
-                  solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
-
-                  if ( solved ) fill_edge_order(i_order, v, previous_i_rm, i_rm);
-
-                  // LEVEL 4: add the next independent edge as the next edge "H 6 H"
-                  if ( ! solved )
-                  {
-                     u = v + 3; // the next 'H' atom
-                     strcpy(u_atom_type, "H"); // atom type of 'u'
-
-                     // restoring the values of the auxiliary variables
-                     k_order = i_order;
-                     k_rm = i_rm;
-
-                     // checking if the edge 'H 6 H' exists
-                     strcpy(next_edge_type, "H 6 H");
-                     solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
-                     
-                     // before adding the edge 'H 6 H', we need to add the edge inner edge 'C 4 CA'
-                     if ( solved )
-                     {
-                        u = v + 1; // the next 'C' atom
-                        strcpy(u_atom_type, "C"); // atom type of 'u'
-
-                        // restoring the values of the auxiliary variables
-                        k_order = i_order;
-                        k_rm = i_rm;
-
-                        strcpy(next_edge_type, "C 4 CA");
-                        solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
-                        
-                        // add 'H 6 H'
-                        if ( solved )
-                        {
-                           // considering the addition of the edge 'C 4 CA'
-                           i_order = k_order;
-
-                           fill_edge_order(i_order, u, previous_i_rm, k_rm);
-
-                           v = v + 3; // the first 'H' atom after the initial 'HA' passed in 'v'
-                           strcpy(atom_type, "H"); // atom type of 'u'
-
-                           strcpy(next_edge_type, "H 6 H");
-                           solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
-                        
-                           fill_edge_order(i_order, v, previous_i_rm, i_rm);
-                        }
-                     }
-                  }
-               }
-            }
-         }
-
-         return solved;
-      };
-
-      // auto next_independent_edge = [](int i, char* atom_name, int n_edges){
-      //    int k = -1;
-      //    k = next_HA_edge();
-      //       return 0;
-      // };
-
-      sort_edges_default();
-
-      int my_i_order = 1;
-      int my_v = 1;
-      char my_atom_type[3];
-      my_atom_type[0] = 'H';
-      my_atom_type[1] = 'A';
-      my_atom_type[2] = '\0';
-      int my_i_rm = -1;
-      int my_n = m_nedges;
-      bool solved = false;
-
-      for(int i = 0; i < my_n; i++)
-      {
-         solved = next_HA_edge(my_i_order, my_v, my_atom_type, my_i_rm, my_n);
-         if ( ! solved )
-         {
-            my_v += 3;
-            fill_edge_order(my_i_order, my_v, my_i_rm, my_i_rm);
-         }
-      }
-   }
-
-   void sort_edges( const std::string& order, const bool verbose = false )
-   {
-      if ( order == "default" )
-         sort_edges_default();
-      else
-         throw std::invalid_argument( "Invalid order (" + order + ")" );
-
-      if( verbose )
-         for ( int k = 0; k < m_nedges; ++k )
-            m_edges[ k ].show();
-   }
-
-   void solve( double tmax, const std::string& order )
+   void solve( double tmax )
    {
       printf( "SBBU: tmax = %g\n", tmax );
       printf( "SBBU: dtol = %g\n", m_dtol );
       printf( "SBBU: imax = %g\n", (double)m_imax );
       printf( "SBBU: prune_edges = %d\n", m_nedges );
 
-      sort_edges( order, true );
+      sort_edges_by_order( );
+      // sort_edges_default( );
 
       double tic = omp_get_wtime();
       for ( int k = 0; k < m_nedges; ++k )
       {
-         solve_edge( m_edges[ k ] );
+         const auto& edge = m_edges[ k ];         
+         solve_edge( edge );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
-      }      
+
+         assert_partial_feasibility( k );
+      }
       double toc = omp_get_wtime() - tic;
       printf( "SBBU: solution found after %g secs\n", toc );
 

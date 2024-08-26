@@ -108,7 +108,7 @@ public:
 
       int i, j, k = 0;
       char iatom[ 3 ], jatom[ 3 ];
-      int iresnumber, jresnumber;
+      int order;
       double l, u;
       m_nedges = m_nnodes = 0;
 
@@ -121,7 +121,7 @@ public:
       }
 
       // count nodes and edges.
-      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%d,%d,%lf,%*[^\n]\n", &i, &j, iatom, jatom, &iresnumber, &jresnumber, &l ) )
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d\n", &i, &j, iatom, jatom, &l, &order ) )
       {
          m_nedges += 2; // add (i,j) and (j,i)
          m_nnodes = MAX( m_nnodes, i );
@@ -143,45 +143,39 @@ public:
 
       m_edges = (edge_t*)malloc( m_nedges * sizeof( edge_t ) );
 
-      char edge_type[ 9 ];
-      int diff_ji;
-      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%d,%d,%lf,%*[^\n]\n", &i, &j, iatom, jatom, &iresnumber, &jresnumber, &l ) )
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d\n", &i, &j, iatom, jatom, &l, &order ) )
       {
          u = l; // the files contain just one exact distance per row.
 
-         // keeping edges increasingly ordered
-         if ( i > j ) SWAP( i, j );
-
-         // cleaning the array 'edge_type'
-         strcpy( edge_type, "" );
-
-         // setting the edge type
-         diff_ji = j - i;
-         sprintf( edge_type, "%s %d %s", iatom, diff_ji, jatom );
-         // printf( "%s\n", edge_type );
+         // throw an exception if the edge is invalid
+         if ( i > j ) 
+            throw std::invalid_argument( "Invalid edge (" + std::to_string( i ) + ", " + std::to_string( j ) + ")" );
 
          // add (i, j)
          m_edges[ k ].m_i = i;
          m_edges[ k ].m_j = j;
          m_edges[ k ].m_l = l;
          m_edges[ k ].m_u = u;
-         strcpy( m_edges[ k++ ].m_type, edge_type );
+         m_edges[ k++ ].m_order = order;
 
          // add (i, j)
          m_edges[ k ].m_i = j;
          m_edges[ k ].m_j = i;
          m_edges[ k ].m_l = l;
          m_edges[ k ].m_u = u;
-         strcpy( m_edges[ k++ ].m_type, edge_type );
+         m_edges[ k++ ].m_order = order;
       }
       fclose( fid );
 
-      // set CSR idx
+      // sort m_edges by
       std::sort( &m_edges[ 0 ], &m_edges[ m_nedges ] );
 
       m_i.assign( m_nnodes + 1, i = 0 );
+      // count the number of edges incident to each node
       for ( k = 0; k < m_nedges; ++k )
          m_i[ m_edges[ k ].m_i + 1 ]++;
+      
+      // set the CSR index
       for ( k = 0; k < m_nnodes; ++k )
          m_i[ k + 1 ] += m_i[ k ];
 
