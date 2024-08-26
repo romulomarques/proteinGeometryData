@@ -471,33 +471,39 @@ public:
    }
 
    void set_order_indexes_prioritizing_HX_9_HX_distances()
-   {
-      sort_edges_default();
+   {  
       
-      auto get_atom_name_j_from_edge_ij = [](char* atom_type, const edge_t& this_edge){
-         const char* edge_type = this_edge.m_type;
-         int n_et = strlen(edge_type);
-         
-         if ( n_et >= 2 )
+      // set the position in the new order of each unvisited edge between a previous 'pos_a'-th edge 
+      // and the current 'i_rm'-th edge as 'i_order, i_order + 1, ... '
+      // i_order: the in-contruction-order index of the next edge to be visited;
+      // v: the rightmost vertex of all visited edges;
+      // i_rm: the index of the rightmost visited edge;
+      auto fill_edge_order = [this](int& i_order, int& v, int pos_a, int& i_rm)
+      {
+         for(int i = pos_a + 1; i < i_rm; i++)
          {
-            int end_an = 2;
-
-            atom_type[0] = edge_type[n_et - 2];
-            atom_type[1] = edge_type[n_et - 1];
-
-            // the atom name has only 1 character
-            if ( atom_type[0] == ' ' )
+            edge_t* this_edge = &m_edges[i];
+            if (this_edge->m_order < 1)
             {
-               atom_type[0] = atom_type[1];
-               end_an = 1;
+               this_edge->m_order = i_order;
+               ++i_order;
             }
-            
-            // guaranteeing the atom name has at most 2 characters
-            if ( strlen(atom_type) >= 3 )
-               atom_type[end_an] = '\0';
-         } 
-      };
+         }
 
+         int n = m_nedges;
+         int i = i_rm + 1;
+         while( (m_edges[i].m_j <= v) && (i < n) )
+         {
+            edge_t* this_edge = &m_edges[i];
+            if (this_edge->m_order < 1)
+            {
+               this_edge->m_order = i_order;
+               ++i_order;
+               i_rm = i;
+            }
+            ++i;
+         }
+      };
       
       // set the position of a edge type 'edge_type' in the new order.
       // i_order: the in-contruction-order index of the next edge to be visited;
@@ -534,56 +540,141 @@ public:
          return false;
       };
       
-      // sets the next group of edges prioritizing to start with a edge "HA 9 H" as
+      // set the next group of edges prioritizing to start with a edge "HA 9 H" as
       // the next independent edge.
       // i_order: the in-contruction-order index of the next edge to be visited;
       // v: the rightmost vertex of all visited edges;
       // atom_type: the atom type of the vertex 'v';
       // i_rm: the index of the rightmost visited edge;
       // n == len(m_edges).
-      auto next_HA_edge = [this, set_edge_position](int& i_order, int& v, char* atom_type, int& i_rm, int n){
+      auto next_HA_edge = [this, set_edge_position, fill_edge_order](int& i_order, int& v, char* atom_type, int& i_rm, int n){
          const edge_t* edge_rm = &m_edges[i_rm];
-         
-         // getting the atom name from the edge type
-         // char atom_type[3];
-         // get_atom_name_j_from_edge_ij(atom_type, *edge_rm);
+         bool solved = false;
 
-         // we try to add the next edges only if the current rightmost vertex is a 'HA'
+         // auxiliary copies of the parameters
+         int k_order = i_order;
+         int u = v;
+         char u_atom_type[9];
+         strcpy(u_atom_type, atom_type);
+         int k_rm = i_rm;
+         int previous_i_rm = i_rm;
+
+         // LEVEL 1: add the next independent edge as the next edge "HA 9 H"
+         char next_edge_type[9];
          if ( strcmp(atom_type, "HA") == 0 )
          {
-            // bool is_edge_found = false;
-            // int this_i_rm = i_rm;
-            // edge_t* this_edge;
-            // for(int i = i_rm + 1; i < n; i++)
-            // {
-            //    this_edge = &m_edges[i];
+            strcpy(next_edge_type, "HA 9 H"); 
+            solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
 
-            //    if ( (this_edge->m_i == v) && (strcmp(this_edge->m_type, "HA 9 H") == 0) )
-            //    {
-            //       this_edge->m_order = i_order;
-            //       ++i_order;
-            //       v = this_edge->m_j;
-            //       strcpy(atom_type, "H");
-            //       this_i_rm = i;
-            //       is_edge_found = true;
-            //       break;
-            //    }
-            //    else
-            //    {
-            //       if (this_edge->m_j > v+9)
-            //          break;
-            //    }
-            // }
-            // int this_i_rm = i_rm;
-            char next_edge_type[9];
-            strcpy(next_edge_type, "HA 9 H");
-            bool solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
-            printf("arroz\n");
-            // i_rm = this_i_rm;
+            if ( solved ) fill_edge_order(i_order, v, previous_i_rm, i_rm);
+
+            // LEVEL 2: add the next independent edge as the next edge "H 9 HA"
+            if ( ! solved )
+            {
+               u = v + 3; // the next 'H' atom
+               strcpy(u_atom_type, "H"); // atom type of 'u'
+
+               // checking if the edge 'H 9 HA' exists
+               strcpy(next_edge_type, "H 9 HA");
+               solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
+
+               // before adding the edge 'H 9 HA', we need to add the edge inner edge 'C 4 CA'
+               if ( solved )
+               {
+                  u = v + 1; // the next 'C' atom
+                  strcpy(u_atom_type, "C"); // atom type of 'u'
+
+                  // restoring the values of the auxiliary variables
+                  k_order = i_order;
+                  k_rm = i_rm;
+
+                  strcpy(next_edge_type, "C 4 CA");
+                  solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
+
+                  // add 'H 9 HA'
+                  if ( solved )
+                  {
+                     // considering the addition of the edge 'C 4 CA'
+                     i_order = k_order;
+
+                     fill_edge_order(i_order, u, previous_i_rm, k_rm);
+
+                     v = v + 3; // the first 'H' atom after the initial 'HA' passed in 'v'
+                     strcpy(atom_type, "H"); // atom type of 'u'
+
+                     strcpy(next_edge_type, "H 9 HA");
+                     solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
+
+                     fill_edge_order(i_order, v, previous_i_rm, i_rm);
+                  }
+               }
+               // LEVEL 3: add the next independent edge as the next edge "HA 6 HA"
+               else 
+               {
+                  strcpy(next_edge_type, "HA 6 HA");
+                  solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
+
+                  if ( solved ) fill_edge_order(i_order, v, previous_i_rm, i_rm);
+
+                  // LEVEL 4: add the next independent edge as the next edge "H 6 H"
+                  if ( ! solved )
+                  {
+                     u = v + 3; // the next 'H' atom
+                     strcpy(u_atom_type, "H"); // atom type of 'u'
+
+                     // restoring the values of the auxiliary variables
+                     k_order = i_order;
+                     k_rm = i_rm;
+
+                     // checking if the edge 'H 6 H' exists
+                     strcpy(next_edge_type, "H 6 H");
+                     solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
+                     
+                     // before adding the edge 'H 6 H', we need to add the edge inner edge 'C 4 CA'
+                     if ( solved )
+                     {
+                        u = v + 1; // the next 'C' atom
+                        strcpy(u_atom_type, "C"); // atom type of 'u'
+
+                        // restoring the values of the auxiliary variables
+                        k_order = i_order;
+                        k_rm = i_rm;
+
+                        strcpy(next_edge_type, "C 4 CA");
+                        solved = set_edge_position(k_order, u, u_atom_type, k_rm, n, next_edge_type);
+                        
+                        // add 'H 6 H'
+                        if ( solved )
+                        {
+                           // considering the addition of the edge 'C 4 CA'
+                           i_order = k_order;
+
+                           fill_edge_order(i_order, u, previous_i_rm, k_rm);
+
+                           v = v + 3; // the first 'H' atom after the initial 'HA' passed in 'v'
+                           strcpy(atom_type, "H"); // atom type of 'u'
+
+                           strcpy(next_edge_type, "H 6 H");
+                           solved = set_edge_position(i_order, v, atom_type, i_rm, n, next_edge_type);
+                        
+                           fill_edge_order(i_order, v, previous_i_rm, i_rm);
+                        }
+                     }
+                  }
+               }
+            }
          }
 
-         return 0;
+         return solved;
       };
+
+      // auto next_independent_edge = [](int i, char* atom_name, int n_edges){
+      //    int k = -1;
+      //    k = next_HA_edge();
+      //       return 0;
+      // };
+
+      sort_edges_default();
 
       int my_i_order = 1;
       int my_v = 1;
@@ -593,20 +684,17 @@ public:
       my_atom_type[2] = '\0';
       int my_i_rm = -1;
       int my_n = m_nedges;
-      next_HA_edge(my_i_order, my_v, my_atom_type, my_i_rm, my_n);
+      bool solved = false;
 
-      // // sets the next group of edges prioritizing to start with a edge "H 9 HA" as
-      // // the next independent edge.
-      // auto next_H_edge = [](int i, char* atom_name, int n){
-      //    return 0;
-      // };
-      
-      // auto next_independent_edge = [](int i, char* atom_name, int n_edges){
-      //    int k = -1;
-      //    //k = next_HA_edge();
-         
-      //    return 0;
-      // };
+      for(int i = 0; i < my_n; i++)
+      {
+         solved = next_HA_edge(my_i_order, my_v, my_atom_type, my_i_rm, my_n);
+         if ( ! solved )
+         {
+            my_v += 3;
+            fill_edge_order(my_i_order, my_v, my_i_rm, my_i_rm);
+         }
+      }
    }
 
    void sort_edges( const std::string& order, const bool verbose = false )
