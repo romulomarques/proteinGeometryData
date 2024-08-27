@@ -446,6 +446,22 @@ public:
          k = find_root( ck->m_j + 1 );
          ck = &m_c[ k ];
       }
+      if ( (edge.m_i == 4) && (edge.m_j == 10) )
+      {
+         int la = m_n - 1;
+         int pos = 1;
+         int aux_d = 7;
+         bool aux_f = false;
+         for(la = m_n; la > pos; la--)
+         {
+            m_d[la] = m_d[la-1];
+            m_f[la] = m_f[la-1];
+         }
+         m_d[la] = aux_d;
+         m_f[la] = aux_f;
+         ++m_n;
+      }
+
       cr.create_planes( edge.m_j, m_d, m_n );
 
       // searching
