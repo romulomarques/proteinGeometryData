@@ -18,11 +18,11 @@ public:
       for ( int i = 0; i < m_nnodes; ++i )
       {
          // printf("%s::%d i = %d\n", __FILE__, __LINE__, i);
-         if ( i > 0 )
+         if ( i > 2 )
          {
-            get_bounds( i, i - 1, l, u );
+            get_bounds( i, i - 3, l, u );
             if ( fabs( l - u ) > 0 )
-               throw std::invalid_argument( "The edge (" + std::to_string( i ) + ", " + std::to_string( i - 1 ) + ") is not exact." );
+               throw std::invalid_argument( "The edge (" + std::to_string( i ) + ", " + std::to_string( i - 3 ) + ") is not exact." );
             m_a2[ i ] = l * l;
          }
          if ( i > 1 )
@@ -32,11 +32,11 @@ public:
                throw std::invalid_argument( "The edge (" + std::to_string( i ) + ", " + std::to_string( i - 2 ) + ") is not exact." );
             m_b2[ i ] = l * l;
          }
-         if ( i > 2 )
+         if ( i > 0 )
          {
-            get_bounds( i, i - 3, l, u );
+            get_bounds( i, i - 1, l, u );
             if ( fabs( l - u ) > 0 )
-               throw std::invalid_argument( "The edge (" + std::to_string( i ) + ", " + std::to_string( i - 3 ) + ") is not exact." );
+               throw std::invalid_argument( "The edge (" + std::to_string( i ) + ", " + std::to_string( i - 1 ) + ") is not exact." );
             m_c2[ i ] = l * l;
          }
       }

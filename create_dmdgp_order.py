@@ -2,6 +2,8 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 dmdgp_HA9H = "dmdgp_HA9H"
 if not os.path.exists(dmdgp_HA9H):
@@ -102,14 +104,44 @@ def save_dmdg_order(fn_pkl: str, discrete_edges: list, prune_edges: list) -> lis
     df[cols].to_csv(fn_csv, index=False)
 
 
-if __name__ == "__main__":
-    fn_pkl = "dmdgp/1wj5_model1_chainA_segment5.pkl"
+def process_file(fn_pkl):
     dmdgp = read_dmdgp(fn_pkl)
     prune_edges, discrete_edges = classify_edges(dmdgp)
-    prune_edges = sort_prune_edges(prune_edges, verbose=True)
+    prune_edges = sort_prune_edges(prune_edges, verbose=False)
 
-    fn_pkl = fn_pkl.replace("dmdgp", "dmdgp_HA9H")
-    save_dmdg_order(fn_pkl, discrete_edges, prune_edges)
+    # Modify the filename for saving
+    fn_pkl_new = fn_pkl.replace("dmdgp", "dmdgp_HA9H")
+    save_dmdg_order(fn_pkl_new, discrete_edges, prune_edges)
+
+
+def main():
+    instances_dir = "dmdgp"
+    filenames = [os.path.join(instances_dir, fn) 
+                 for fn in os.listdir(instances_dir) if fn.endswith(".pkl")]
+    
+    # Create a ThreadPoolExecutor
+    with ThreadPoolExecutor() as executor:
+        # Submit tasks to the executor
+        futures = {executor.submit(process_file, fn): fn for fn in filenames}
+        
+        # Use tqdm to show progress
+        for future in tqdm(as_completed(futures), total=len(futures)):
+            fn_pkl = futures[future]
+            try:
+                future.result()  # Get the result to raise exceptions if any occurred
+            except Exception as e:
+                print(f"Error processing {fn_pkl}: {e}")
+
+if __name__ == "__main__":
+    main()
+
+
+if __name__ == "__main__":
+    # fn_pkl = "dmdgp/1wj5_model1_chainA_segment5.pkl"
+    # process_file(fn_pkl)
+
+    main()
+        
 
     # copy_to_clipboard(json.dumps(source_list, indent=4))
     # print(json.dumps(source_list, indent=4))

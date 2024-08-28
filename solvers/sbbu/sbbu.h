@@ -9,9 +9,9 @@
 struct cluster_t {
 public:
    double* m_d;  // decision vector
-   double* m_a2; // vector of squared distances to x[i-1]
+   double* m_a2; // vector of squared distances to x[i-3]
    double* m_b2; // vector of squared distances to x[i-2]
-   double* m_c2; // vector of squared distances to x[i-3]
+   double* m_c2; // vector of squared distances to x[i-1]
    ddgp_t* m_dgp;
    int m_i;
    int m_j; // index of the node whose distance must be calculated to the i-th node
@@ -59,9 +59,9 @@ public:
       m_m = 0; // number of planes
       for ( int k = 0; k < n; ++k )
       {
-         const double* a = &m_x[ 3 * ( d[ k ] - 1 ) ];
+         const double* a = &m_x[ 3 * ( d[ k ] - 3 ) ];
          const double* b = &m_x[ 3 * ( d[ k ] - 2 ) ];
-         const double* c = &m_x[ 3 * ( d[ k ] - 3 ) ];
+         const double* c = &m_x[ 3 * ( d[ k ] - 1 ) ];
          add_plane( a, b, c );
          ++m_m;
       }
@@ -225,6 +225,8 @@ public:
 
       qs_p( P, N, A, a2, B, b2, C, c2, m_dtol );
 
+      // Maybe we need to modify this block: I changed a->(i-1), a->(i-2), a->(i-3)
+      // to a->(i-3), a->(i-2), a->(i-1)
       double beta = vec3_dist2( P, A );
       if ( a2 + m_dtol < beta )
          throw std::runtime_error( "The step size could not be calculated." );
@@ -241,17 +243,17 @@ public:
 
    inline void bck_x( int i )
    {
-      const double* A = &m_x[ 3 * ( i + 1 ) ];
+      const double* A = &m_x[ 3 * ( i + 3 ) ];
       const double* B = &m_x[ 3 * ( i + 2 ) ];
-      const double* C = &m_x[ 3 * ( i + 3 ) ];
+      const double* C = &m_x[ 3 * ( i + 1 ) ];
       set_x( i, A, m_dgp.m_a2[ i + 1 ], B, m_dgp.m_b2[ i + 2 ], C, m_dgp.m_c2[ i + 3 ] );
    }
 
    inline void fwd_x( int i )
    {
-      const double* A = &m_x[ 3 * ( i - 1 ) ];
+      const double* A = &m_x[ 3 * ( i - 3 ) ];
       const double* B = &m_x[ 3 * ( i - 2 ) ];
-      const double* C = &m_x[ 3 * ( i - 3 ) ];
+      const double* C = &m_x[ 3 * ( i - 1 ) ];
       set_x( i, A, m_dgp.m_a2[ i ], B, m_dgp.m_b2[ i ], C, m_dgp.m_c2[ i ] );
    }
 
@@ -318,11 +320,17 @@ public:
       m_root[ i ] = r;
    }
 
-   void save( std::string fname )
+   void save( std::string fname, std::string solution_dir )
    {
+      size_t i_last_delimitator = fname.find_last_of('/');
+      std::string just_fname = fname.substr(i_last_delimitator + 1); // Extract the file name from the file path
+      std::string fn_ext = fname.substr(fname.find_last_of('.')); // gets the file extension
+      
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, fname.c_str() );
-      char* p = strstr( fsol, ".csv" ); // returns a pointer to the first occurrence of ".nmr"
+      strcpy( fsol, solution_dir.c_str() );
+      strcat( fsol, "/" );
+      strcat( fsol, just_fname.c_str() );
+      char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
       sprintf( p, "_sbbu.sol" );        // replace suffix
 
       printf( "SBBU: saving solution on %s\n", fsol );
@@ -459,7 +467,7 @@ public:
          if ( ck->m_j + 1 == m_nnodes )
             break;
 
-         // next cluster
+         // root of the next cluster
          k = find_root( k - m_root[ k ] );
          ck = &m_c[ k ];
       }      

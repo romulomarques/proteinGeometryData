@@ -15,13 +15,13 @@ int main(int argc, char *argv[])
     double dtol = options.read_param("-dtol", 1e-3);
     int imax = options.read_param("-imax", 1E9);
 
-    // instances to test:
-    //  -> dmdgp/9pcy_model1_chainA_segment0.csv
-    //  -> dmdgp/1a11_model1_chainA_segment0.csv
-    
     ddgp_t dgp(fname, dtol);
-    sbbu_t sbbu(dgp, dtol, imax);    
+    sbbu_t sbbu(dgp, dtol, imax);   
     sbbu.solve(tmax);
-    // sbbu.save(fname);
+    
+    // defining directory to save the results
+    std::string sol_dir = std::string("dmdgp_HA9H_sol");
+    sbbu.save(fname, sol_dir);
+    
     return EXIT_SUCCESS;
 }
