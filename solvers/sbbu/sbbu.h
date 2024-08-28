@@ -99,8 +99,6 @@ public:
    // n = len(f) = len(d)
    inline void reflect_all( int* d, bool* f, int n , int j )
    {
-      // reset x[j,:]
-      vec3_copy( &m_x[3 * j], m_y );
       // apply from last to first
       for ( int k = n - 1; k >= 0; --k )
          if ( f[ k ] )
@@ -141,7 +139,7 @@ public:
 
    sbbu_t( ddgp_t& dgp, double dtol, int imax )
        : m_dgp( dgp )
-   {
+   {      
       m_nnodes = dgp.m_nnodes;
       m_dtol = dtol;
       m_imax = imax;
@@ -153,7 +151,7 @@ public:
       m_plane_w = (double*)malloc( dgp.m_nnodes * sizeof( double ) );
 
       // init (prune) edges
-      init_edges();
+      select_prune_edges();
 
       // init m_x;
       m_x = (double*)malloc( 3 * m_nnodes * sizeof( double ) );
@@ -274,7 +272,7 @@ public:
       m_c[ k ].m_w = m_plane_w;
    }
 
-   void init_edges()
+   void select_prune_edges()
    {
       // counting prunning edges
       m_nedges = 0;
@@ -377,14 +375,29 @@ public:
          ++niters;
       }
 
+      vec3_copy( xj, cr.m_y );
+
       return eij_min;
    }
 
-   void assert_partial_feasibility( int edge_id )
-   {
-      for ( int k = 0; k <= edge_id; ++k )
+   void assert_partial_feasibility( int edge_order )
+   {      
+      // comparison by m_order
+      auto cmp_edges = []( const void* x, const void* y ) {
+         return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
+      };
+      qsort( m_dgp.m_edges, m_dgp.m_nedges, sizeof( edge_t ), cmp_edges );
+
+      // check all edges            
+      for ( int k = 0; true; ++k )
       {
-         edge_t& edge = m_edges[ k ];
+         edge_t& edge = m_dgp.m_edges[ k ];
+         if( edge.m_order > edge_order )
+            break;
+
+         if ( ( edge.m_i > edge.m_j ) || ( edge.m_j > m_j ) )
+            continue;
+
          double* xi = &m_x[ 3 * edge.m_i ];
          double* xj = &m_x[ 3 * edge.m_j ];
          double eij = vec3_dist( xi, xj ) - edge.m_l;
@@ -430,37 +443,26 @@ public:
       // create d :: vector of decisions
       m_n = 0; // number of decisions to be taken
       cluster_t* ck = &cr;
-      for ( int k = r; ck->m_i <= edge.m_j; )
+      for ( int k = r; ck->m_i <= edge.m_j;)
       {
          merge_cluster( k, r );
+
          // add to decision vector
          m_d[ m_n ] = k;
+         
+         k = r;
+
          // reset the flip vector
-         m_f[ m_n ] = false;
-         ++m_n;
+         m_f[ m_n++ ] = false;
          
          // last feasible cluster
          if ( ck->m_j + 1 == m_nnodes )
             break;
+
          // next cluster
-         k = find_root( ck->m_j + 1 );
+         k = find_root( k - m_root[ k ] );
          ck = &m_c[ k ];
-      }
-      if ( (edge.m_i == 4) && (edge.m_j == 10) )
-      {
-         int la = m_n - 1;
-         int pos = 1;
-         int aux_d = 7;
-         bool aux_f = false;
-         for(la = m_n; la > pos; la--)
-         {
-            m_d[la] = m_d[la-1];
-            m_f[la] = m_f[la-1];
-         }
-         m_d[la] = aux_d;
-         m_f[la] = aux_f;
-         ++m_n;
-      }
+      }      
 
       cr.create_planes( edge.m_j, m_d, m_n );
 
@@ -478,7 +480,7 @@ public:
       cr.reflect_all( m_d, m_fopt, m_n, m_j );
    }
 
-   void sort_edges_default()
+   void sort_edges_default( edge_t* edges, int nedges )
    {
       // edge a, edge b
       // a < b, if a.j < b.j or (a.j == b.j and a.i > b.i)
@@ -493,15 +495,15 @@ public:
          return dx - dy;
       };
 
-      qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
+      qsort( edges, nedges, sizeof( edge_t ), cmp_edges );
    }
 
-   void sort_edges_by_order()
+   void sort_edges_by_order( edge_t* edges, int nedges )
    {
       auto cmp_edges = []( const void* x, const void* y ) {
          return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
       };
-      qsort( m_edges, m_nedges, sizeof( edge_t ), cmp_edges );
+      qsort( edges, nedges, sizeof( edge_t ), cmp_edges );
    }   
 
    void solve( double tmax )
@@ -511,18 +513,20 @@ public:
       printf( "SBBU: imax = %g\n", (double)m_imax );
       printf( "SBBU: prune_edges = %d\n", m_nedges );
 
-      sort_edges_by_order( );
+      sort_edges_by_order( m_edges, m_nedges );
+
       // sort_edges_default( );
 
       double tic = omp_get_wtime();
       for ( int k = 0; k < m_nedges; ++k )
       {
+         // printf( "SBBU: solving edge %d\n", k );
          const auto& edge = m_edges[ k ];         
          solve_edge( edge );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
 
-         assert_partial_feasibility( k );
+         // assert_partial_feasibility( edge.m_order );
       }
       double toc = omp_get_wtime() - tic;
       printf( "SBBU: solution found after %g secs\n", toc );
