@@ -49,13 +49,13 @@ def create_table(flog):
 
 if __name__ == "__main__":
     tmax = 300
-    WDIR = ['DATA_EPSD_00_DMAX_50', 'DATA_EPSD_00_DMAX_60']
-    solver = 'sbbu.exe' if os.name == 'nt' else './sbbu.exe'
+    WDIR = ['/home/michael/gitrepos/rs_ROMULO/dmdgp_HA9H']
+    solver = '/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/sbbu.exe'
     for wdir in WDIR:
         FILES = []
         for fname in os.listdir(wdir):
             fname = os.path.join(wdir, fname)
-            if fname.endswith('.nmr'):
+            if fname.endswith('.nmr') or fname.endswith('.csv'):
                 FILES.append({'name': fname, 'size': os.path.getsize(fname)})
         FILES = sorted(FILES, key=lambda x: x['size'])
 

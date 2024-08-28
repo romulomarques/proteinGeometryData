@@ -3,7 +3,7 @@ import pickle
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 
 dmdgp_HA9H = "dmdgp_HA9H"
 if not os.path.exists(dmdgp_HA9H):
@@ -94,17 +94,18 @@ def classify_edges(dmdgp: pd.DataFrame) -> list:
 
 def save_dmdg_order(fn_pkl: str, discrete_edges: list, prune_edges: list) -> list:
     df = pd.DataFrame(discrete_edges + prune_edges).reset_index(drop=True)
-    df['order'] = df.index
-    cols = ["i", "j", "i_name","j_name", "dij", "order"]
-    with open(fn_pkl, "wb") as f:
-        pickle.dump(df[cols], f)
+    df["order"] = df.index
+    cols = ["i", "j", "i_name", "j_name", "dij", "order"]
+    
+    # with open(fn_pkl, "wb") as f:
+    #     pickle.dump(df[cols], f)
 
     # export to CSV
     fn_csv = fn_pkl.replace(".pkl", ".csv")
     df[cols].to_csv(fn_csv, index=False)
 
 
-def process_file(fn_pkl):
+def process_instance(fn_pkl):
     dmdgp = read_dmdgp(fn_pkl)
     prune_edges, discrete_edges = classify_edges(dmdgp)
     prune_edges = sort_prune_edges(prune_edges, verbose=False)
@@ -115,25 +116,20 @@ def process_file(fn_pkl):
 
 
 def main():
-    instances_dir = "dmdgp"
-    filenames = [os.path.join(instances_dir, fn) 
-                 for fn in os.listdir(instances_dir) if fn.endswith(".pkl")]
-    
-    # Create a ThreadPoolExecutor
-    with ThreadPoolExecutor() as executor:
-        # Submit tasks to the executor
-        futures = {executor.submit(process_file, fn): fn for fn in filenames}
-        
-        # Use tqdm to show progress
-        for future in tqdm(as_completed(futures), total=len(futures)):
-            fn_pkl = futures[future]
-            try:
-                future.result()  # Get the result to raise exceptions if any occurred
-            except Exception as e:
-                print(f"Error processing {fn_pkl}: {e}")
+    dmdgp_directory = "dmdgp"
+    dmdgph_paths = []    
+    for fn in os.listdir(dmdgp_directory): 
+        if fn.endswith(".pkl"):
+            dmdgph_paths.append(os.path.join(dmdgp_directory, fn))
 
-if __name__ == "__main__":
-    main()
+    # Create a ThreadPoolExecutor
+    with ProcessPoolExecutor() as executor:
+        list(
+            tqdm(
+                executor.map(process_instance,dmdgph_paths),
+                total=len(dmdgph_paths),
+            )
+        )
 
 
 if __name__ == "__main__":
@@ -141,8 +137,3 @@ if __name__ == "__main__":
     # process_file(fn_pkl)
 
     main()
-        
-
-    # copy_to_clipboard(json.dumps(source_list, indent=4))
-    # print(json.dumps(source_list, indent=4))
-    # print("Done!")

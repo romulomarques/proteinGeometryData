@@ -7,7 +7,7 @@
 #include "utils.h"
 
 int main(int argc, char *argv[])
-{    
+{
     options_t options(argc, argv);
 
     std::string fname = options.read_param("-nmr", "none");
@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     sbbu.solve(tmax);
     
     // defining directory to save the results
-    std::string sol_dir = std::string("dmdgp_HA9H_sol");
+    std::string sol_dir = std::string("dmdgp_HA9H_sbbu");
     sbbu.save(fname, sol_dir);
     
     return EXIT_SUCCESS;

@@ -78,18 +78,18 @@ public:
       double* A = &m_a[ 3 * m_m ];
       double* N = &m_n[ 3 * m_m ];
 
-      vec3_copy( A, a);
+      vec3_copy( A, a );
       vec3_cross( N, U, V );
       vec3_unit( N );
-      m_w[ m_m ] = vec3_dot( A, N );      
+      m_w[ m_m ] = vec3_dot( A, N );
    }
 
    // n = len(f)
-   inline void reflect( bool* f, int n, double *xj)
-   {      
+   inline void reflect( bool* f, int n, double* xj )
+   {
       // reset x[j,:]
       vec3_copy( xj, m_y );
-      
+
       // apply from last to first
       for ( int k = n - 1; k >= 0; --k )
          if ( f[ k ] )
@@ -97,7 +97,7 @@ public:
    }
 
    // n = len(f) = len(d)
-   inline void reflect_all( int* d, bool* f, int n , int j )
+   inline void reflect_all( int* d, bool* f, int n, int j )
    {
       // apply from last to first
       for ( int k = n - 1; k >= 0; --k )
@@ -139,7 +139,7 @@ public:
 
    sbbu_t( ddgp_t& dgp, double dtol, int imax )
        : m_dgp( dgp )
-   {      
+   {
       m_nnodes = dgp.m_nnodes;
       m_dtol = dtol;
       m_imax = imax;
@@ -199,10 +199,10 @@ public:
    {
       // forward to set x
       for ( int i = m_j + 1; i <= j; ++i )
-         fwd_x( i );      
-      
-      if( j > m_j )
-         m_j = j;      
+         fwd_x( i );
+
+      if ( j > m_j )
+         m_j = j;
    }
 
    // Set m_x[i] given points A, B, C and their distances a2, b2, c2.
@@ -291,7 +291,7 @@ public:
          edge_t& edge = m_dgp.m_edges[ k ];
          if ( edge.m_j - edge.m_i > 3 )
             m_edges[ m_nedges++ ] = edge;
-      }      
+      }
    }
 
    // Returns the (index) root associated to the vertex i cluster.
@@ -322,16 +322,16 @@ public:
 
    void save( std::string fname, std::string solution_dir )
    {
-      size_t i_last_delimitator = fname.find_last_of('/');
-      std::string just_fname = fname.substr(i_last_delimitator + 1); // Extract the file name from the file path
-      std::string fn_ext = fname.substr(fname.find_last_of('.')); // gets the file extension
-      
+      size_t i_last_delimitator = fname.find_last_of( '/' );
+      std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
+      std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
+
       char fsol[ FILENAME_MAX ];
       strcpy( fsol, solution_dir.c_str() );
       strcat( fsol, "/" );
       strcat( fsol, just_fname.c_str() );
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
-      sprintf( p, "_sbbu.sol" );        // replace suffix
+      sprintf( p, ".sol" );                     // replace suffix
 
       printf( "SBBU: saving solution on %s\n", fsol );
       FILE* fid = fopen( fsol, "w" );
@@ -352,7 +352,7 @@ public:
       int niters = 0;
 
       double eij_min = m_dtol;
-      
+
       for ( int k = kmax, count = 0; count < m_imax; ++count )
       {
          eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
@@ -389,18 +389,18 @@ public:
    }
 
    void assert_partial_feasibility( int edge_order )
-   {      
+   {
       // comparison by m_order
       auto cmp_edges = []( const void* x, const void* y ) {
-         return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
+         return ( (edge_t*)x )->m_order - ( (edge_t*)y )->m_order;
       };
       qsort( m_dgp.m_edges, m_dgp.m_nedges, sizeof( edge_t ), cmp_edges );
 
-      // check all edges            
+      // check all edges
       for ( int k = 0; true; ++k )
       {
          edge_t& edge = m_dgp.m_edges[ k ];
-         if( edge.m_order > edge_order )
+         if ( edge.m_order > edge_order )
             break;
 
          if ( ( edge.m_i > edge.m_j ) || ( edge.m_j > m_j ) )
@@ -416,10 +416,11 @@ public:
                 edge.m_i, edge.m_j, edge.m_l, eij );
             throw std::runtime_error( msg );
          }
-      }      
+      }
    }
 
-   double fbs_traverse(){
+   double fbs_traverse()
+   {
       double eij = 0.0;
       return eij;
    }
@@ -446,23 +447,23 @@ public:
       }
 
       init_x( edge.m_j );
-      cluster_t& cr = m_c[ r ];      
+      cluster_t& cr = m_c[ r ];
 
       // create d :: vector of decisions
       m_n = 0; // number of decisions to be taken
       cluster_t* ck = &cr;
-      for ( int k = r; ck->m_i <= edge.m_j;)
+      for ( int k = r; ck->m_i <= edge.m_j; )
       {
          merge_cluster( k, r );
 
          // add to decision vector
          m_d[ m_n ] = k;
-         
+
          k = r;
 
          // reset the flip vector
          m_f[ m_n++ ] = false;
-         
+
          // last feasible cluster
          if ( ck->m_j + 1 == m_nnodes )
             break;
@@ -470,7 +471,7 @@ public:
          // root of the next cluster
          k = find_root( k - m_root[ k ] );
          ck = &m_c[ k ];
-      }      
+      }
 
       cr.create_planes( edge.m_j, m_d, m_n );
 
@@ -495,7 +496,8 @@ public:
       auto cmp_edges = []( const void* x, const void* y ) {
          // j is different
          auto dj = ( (edge_t*)x )->m_j - ( (edge_t*)y )->m_j;
-         if ( dj ) return dj;
+         if ( dj )
+            return dj;
 
          // j is equal return the edge with small length
          auto dx = ( (edge_t*)x )->m_j - ( (edge_t*)x )->m_i;
@@ -509,10 +511,10 @@ public:
    void sort_edges_by_order( edge_t* edges, int nedges )
    {
       auto cmp_edges = []( const void* x, const void* y ) {
-         return ((edge_t*) x)->m_order - ((edge_t*) y)->m_order;
+         return ( (edge_t*)x )->m_order - ( (edge_t*)y )->m_order;
       };
       qsort( edges, nedges, sizeof( edge_t ), cmp_edges );
-   }   
+   }
 
    void solve( double tmax )
    {
@@ -529,7 +531,7 @@ public:
       for ( int k = 0; k < m_nedges; ++k )
       {
          // printf( "SBBU: solving edge %d\n", k );
-         const auto& edge = m_edges[ k ];         
+         const auto& edge = m_edges[ k ];
          solve_edge( edge );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
