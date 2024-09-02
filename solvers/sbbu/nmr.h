@@ -114,7 +114,7 @@ public:
 
       int i, j, k = 0;
       char iatom[ 3 ], jatom[ 3 ];
-      int order;
+      int order, code;
       double l, u;
       m_nedges = m_nnodes = 0;
 
@@ -127,12 +127,14 @@ public:
       }
 
       // count nodes and edges.
-      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d\n", &i, &j, iatom, jatom, &l, &order ) )
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d,%d\n", &i, &j, iatom, jatom, &l, &order, &code ) )
       {
          m_nedges += 2; // add (i,j) and (j,i)
          m_nnodes = MAX( m_nnodes, i );
          m_nnodes = MAX( m_nnodes, j );
       }
+      ++m_nnodes; // j is zero-based
+      
       if ( verbose )
       {
          printf( "   NMR: nnodes = %d\n", m_nnodes );
@@ -152,7 +154,7 @@ public:
 
       m_edges = (edge_t*)malloc( m_nedges * sizeof( edge_t ) );
 
-      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d\n", &i, &j, iatom, jatom, &l, &order ) )
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d,%d\n", &i, &j, iatom, jatom, &l, &order, &code ) )
       {
          u = l; // the files contain just one exact distance per row.
 
@@ -165,14 +167,16 @@ public:
          m_edges[ k ].m_j = j;
          m_edges[ k ].m_l = l;
          m_edges[ k ].m_u = u;
-         m_edges[ k++ ].m_order = order;
+         m_edges[ k ].m_order = order;
+         m_edges[ k++ ].m_code = code;
 
          // add (i, j)
          m_edges[ k ].m_i = j;
          m_edges[ k ].m_j = i;
          m_edges[ k ].m_l = l;
          m_edges[ k ].m_u = u;
-         m_edges[ k++ ].m_order = order;
+         m_edges[ k ].m_order = order;
+         m_edges[ k++ ].m_code = code;
       }
       fclose( fid );
 
@@ -198,11 +202,34 @@ public:
          m_l[ k ] = m_edges[ k ].m_l;
          m_u[ k ] = m_edges[ k ].m_u;
       }
+
+      for ( int i = 0; i < m_nnodes; ++i )
+      {
+         for ( int k = m_i[ i ]; k < m_i[ i + 1 ]; ++k )
+         {
+            const int j = m_j[ k ];
+            if ( j < 0 || j >= m_nnodes )
+            {
+               throw std::invalid_argument( "Invalid edge (" + std::to_string( i ) + ", " + std::to_string( j ) + ")" );
+            }
+
+            if ( j > i )
+            {
+               break;
+            }
+
+            if ( m_l[ k ] < 0 )
+            {
+               throw std::invalid_argument( "Invalid edge (" + std::to_string( i ) + ", " + std::to_string( j ) + ")" );
+            }
+         }
+      }
    }
 
    bool feasible( const double* x )
    {
       for ( int i = 0; i < m_nnodes; ++i )
+      {
          for ( int k = m_i[ i ]; k < m_i[ i + 1 ]; ++k )
          {
             const int j = m_j[ k ];
@@ -212,6 +239,7 @@ public:
             if ( ( d < ( m_l[ k ] - m_dtol ) ) || ( d > ( m_u[ k ] + m_dtol ) ) )
                return false;
          }
+      }
       return true;
    }
 

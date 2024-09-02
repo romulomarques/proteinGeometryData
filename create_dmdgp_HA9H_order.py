@@ -84,7 +84,7 @@ def sort_prune_edges(pruned_edges: list, verbose: bool) -> list:
     return pruned_edges
 
 
-def classify_edges(dmdgp: pd.DataFrame) -> list:
+def split_prune_and_discrete_edges(dmdgp: pd.DataFrame) -> list:
     # keep only rows where j > i + 3
     is_prune_edge = dmdgp["j"] > dmdgp["i"] + 3
     prune_edges = [edge for _, edge in dmdgp[is_prune_edge].iterrows()]
@@ -92,13 +92,24 @@ def classify_edges(dmdgp: pd.DataFrame) -> list:
     return prune_edges, discrete_edges
 
 
+def set_edges_code(edge_type: str) -> int:
+    if edge_type == "HA9H":
+        return 0
+    elif edge_type == "HA6HA":
+        return 1
+    elif edge_type == "C4CA":
+        return 2
+    return -1
+
+
 def save_dmdg_order(fn_pkl: str, discrete_edges: list, prune_edges: list) -> list:
     df = pd.DataFrame(discrete_edges + prune_edges).reset_index(drop=True)
     df["order"] = df.index
-    cols = ["i", "j", "i_name", "j_name", "dij", "order"]
-    
-    # with open(fn_pkl, "wb") as f:
-    #     pickle.dump(df[cols], f)
+
+    df["code"] = df["type"].apply(set_edges_code)
+
+    cols = ["i", "j", "i_name", "j_name", "dij", "order", "code"]
+    df = df[cols]
 
     # export to CSV
     fn_csv = fn_pkl.replace(".pkl", ".csv")
@@ -107,7 +118,7 @@ def save_dmdg_order(fn_pkl: str, discrete_edges: list, prune_edges: list) -> lis
 
 def process_instance(fn_pkl):
     dmdgp = read_dmdgp(fn_pkl)
-    prune_edges, discrete_edges = classify_edges(dmdgp)
+    prune_edges, discrete_edges = split_prune_and_discrete_edges(dmdgp)
     prune_edges = sort_prune_edges(prune_edges, verbose=False)
 
     # Modify the filename for saving
@@ -117,8 +128,8 @@ def process_instance(fn_pkl):
 
 def main():
     dmdgp_directory = "dmdgp"
-    dmdgph_paths = []    
-    for fn in os.listdir(dmdgp_directory): 
+    dmdgph_paths = []
+    for fn in os.listdir(dmdgp_directory):
         if fn.endswith(".pkl"):
             dmdgph_paths.append(os.path.join(dmdgp_directory, fn))
 
@@ -126,7 +137,7 @@ def main():
     with ProcessPoolExecutor() as executor:
         list(
             tqdm(
-                executor.map(process_instance,dmdgph_paths),
+                executor.map(process_instance, dmdgph_paths),
                 total=len(dmdgph_paths),
             )
         )

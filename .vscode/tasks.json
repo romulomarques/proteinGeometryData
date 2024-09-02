@@ -53,12 +53,26 @@
             },
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": false
             },
             "problemMatcher": [
                 "$gcc"
             ],
             "detail": "Build the solver sbbu.exe with debug flags"
+        },
+        {
+            "label": "black it!",
+            "type": "shell",
+            "command": "black",
+            "args": [
+                "${file}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "detail": "Format the current Python file with black"
         }
     ]
 }

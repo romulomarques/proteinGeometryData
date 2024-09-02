@@ -5,7 +5,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import pickle
 from sklearn.model_selection import train_test_split
-
+from create_dmdgp_HA9H_order import set_edges_code
 
 wd_dmdgp_HA9A_sbbu = "dmdgp_HA9H_sbbu"
 
@@ -43,16 +43,22 @@ def bsol_split_train_test(random_state):
 
 
 def get_edge_type(row: pd.Series) -> str:
-    return f"{row['i_name']} {int(row['j']) - int(row['i'])} {row['j_name']}"
+    return f"{row['i_name']}{int(row['j']) - int(row['i'])}{row['j_name']}"
 
 
 def count_bsol(fname: str) -> pd.DataFrame:
-    df_dmdgp_HA9H_bsol = pd.read_csv(fname, dtype={'bsol': str})
-    df_dmdgp_HA9H_bsol = df_dmdgp_HA9H_bsol[df_dmdgp_HA9H_bsol["j"] - df_dmdgp_HA9H_bsol["i"] > 3]
+    df_dmdgp_HA9H_bsol = pd.read_csv(fname, dtype={"bsol": str})
+    # keep only the pruning edges
+    df_dmdgp_HA9H_bsol = df_dmdgp_HA9H_bsol[
+        df_dmdgp_HA9H_bsol["j"] - df_dmdgp_HA9H_bsol["i"] > 3
+    ]
+    # set the edge type
     df_dmdgp_HA9H_bsol["type"] = df_dmdgp_HA9H_bsol.apply(get_edge_type, axis=1)
-    
-    df_freq = df_dmdgp_HA9H_bsol.groupby(["type", "bsol"]).size().reset_index(name='count')
-    
+
+    df_freq = (
+        df_dmdgp_HA9H_bsol.groupby(["type", "bsol"]).size().reset_index(name="count")
+    )
+
     return df_freq
 
 
@@ -65,33 +71,49 @@ def collect_all_bsol_data(fnames: list) -> pd.DataFrame:
 
     print("Concatenating all the dataframes into a single dataframe...")
     df_dmdgp_HA9H_bsol = pd.concat(data, ignore_index=True)
-    df_dmdgp_HA9H_bsol = df_dmdgp_HA9H_bsol[["type", "bsol", "count"]].groupby(["type", "bsol"])["count"].sum().reset_index()
-    df_dmdgp_HA9H_bsol['total'] = df_dmdgp_HA9H_bsol.groupby('type')['count'].transform('sum')
-    
+    df_dmdgp_HA9H_bsol = (
+        df_dmdgp_HA9H_bsol[["type", "bsol", "count"]]
+        .groupby(["type", "bsol"])["count"]
+        .sum()
+        .reset_index()
+    )
+    df_dmdgp_HA9H_bsol["total"] = df_dmdgp_HA9H_bsol.groupby("type")["count"].transform(
+        "sum"
+    )
+
     print("Calculating the relative frequencies of each pair (edge_type, bsol)...")
-    df_dmdgp_HA9H_bsol['relfreq'] = df_dmdgp_HA9H_bsol['count'] / df_dmdgp_HA9H_bsol['total']
-    df_dmdgp_HA9H_bsol['len_bsol'] = df_dmdgp_HA9H_bsol['bsol'].apply(len)
-    df_dmdgp_HA9H_bsol.sort_values(['len_bsol','type','relfreq'], ascending=[True,True,False], inplace=True)
+    df_dmdgp_HA9H_bsol["relfreq"] = (
+        df_dmdgp_HA9H_bsol["count"] / df_dmdgp_HA9H_bsol["total"]
+    )
+    df_dmdgp_HA9H_bsol["len_bsol"] = df_dmdgp_HA9H_bsol["bsol"].apply(len)
+    df_dmdgp_HA9H_bsol["code"] = df_dmdgp_HA9H_bsol["type"].apply(set_edges_code)
 
-    print("Done!")
-
+    df_dmdgp_HA9H_bsol.sort_values(
+        ["code", "len_bsol", "relfreq"], ascending=[True, True, False], inplace=True
+    )
     return df_dmdgp_HA9H_bsol
 
 
 def save_pkl(fname: str, df: pd.DataFrame):
-    with open(fname + '.pkl', 'wb') as f:
+    with open(fname + ".pkl", "wb") as f:
         pickle.dump(df, f)
 
 
 def save_train_test(df_train: pd.DataFrame, test_files: list):
-    # saving the file names of the test files
-    with open('test_files.txt', 'w') as f:
-        for fname in test_files:
-            f.write(fname + '\n')
-    
+    df_train = df_train[["code","len_bsol","bsol","type","count","total","relfreq"]]
+
+    # saving the file names of the test files    
+    fn_txt = "test_files.txt"
+    print(f"Saving the test files in {fn_txt}")
+    with open(fn_txt, "w") as f:
+        for fn_txt in test_files:
+            f.write(fn_txt + "\n")
+
     # saving the dataframe results of the training files
-    df_train.to_csv('df_train.csv', index=False)
-    save_pkl('df_train', df_train)
+    fn_csv = "df_train.csv"
+    print(f"Saving the training data in {fn_csv}")
+    df_train.to_csv(fn_csv, index=False)
+    save_pkl("df_train", df_train)
 
 
 if __name__ == "__main__":
@@ -101,7 +123,13 @@ if __name__ == "__main__":
     random_state = 42
     train_files, test_files = bsol_split_train_test(random_state)
     # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
-    train_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in train_files if fn.endswith('.csv')]
+    train_files = [
+        os.path.join(wd_dmdgp_HA9A_sbbu, fn)
+        for fn in train_files
+        if fn.endswith(".csv")
+    ]
     df = collect_all_bsol_data(train_files)
-    df_filtered = df[ (df["type"] == "C 4 CA") | (df["type"] == "HA 9 H") | (df["type"] == "HA 6 HA") ]
+    df_filtered = df[
+        (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
+    ]
     save_train_test(df_filtered, test_files)

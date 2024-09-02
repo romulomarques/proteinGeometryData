@@ -85,7 +85,7 @@ public:
    }
 
    // n = len(f)
-   inline void reflect( bool* f, int n, double* xj )
+   inline void reflect( const bool* f, int n, double* xj )
    {
       // reset x[j,:]
       vec3_copy( xj, m_y );
@@ -135,16 +135,19 @@ public:
    edge_t* m_edges;
    cluster_t* m_c;
    double m_dtol;
-   int m_j; // last solved node
-   double* m_times; // time spent to solve each edge
-   bool* m_is_independent; // indicates which edges are "independents"
+   int m_j;          // last solved node
+   double* m_timers; // time spent to solve each edge
+   bool* m_fbs_code; // fbs code = [j, bsol], where j is the index where to overwrite the previous solution
+   int* m_fbs_ivec;  // start index of fbs solutions
+   bool m_dfs_all;   // all possible configurations will be checked in dfs_traverse
 
-   sbbu_t( ddgp_t& dgp, double dtol, int imax )
+   sbbu_t( ddgp_t& dgp, double dtol, int imax, bool dfs_all )
        : m_dgp( dgp )
    {
       m_nnodes = dgp.m_nnodes;
       m_dtol = dtol;
       m_imax = imax;
+      m_dfs_all = dfs_all;
       m_d = (int*)malloc( m_nnodes * sizeof( int ) );
       m_f = (bool*)malloc( m_nnodes * sizeof( bool ) );
       m_fopt = (bool*)malloc( m_nnodes * sizeof( bool ) );
@@ -154,6 +157,9 @@ public:
 
       // init (prune) edges
       select_prune_edges();
+
+      // init fbs
+      read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
 
       // init m_x;
       m_x = (double*)malloc( 3 * m_nnodes * sizeof( double ) );
@@ -181,8 +187,80 @@ public:
       free( m_plane_a );
       free( m_plane_n );
       free( m_plane_w );
-      free( m_times );
-      free( m_is_independent );
+      free( m_timers );
+      free( m_fbs_code );
+      free( m_fbs_ivec );
+   }
+
+   void read_fbs( std::string fcsv, bool verbose = false )
+   {
+      if ( verbose )
+         printf( "Reading file %s\n", fcsv.c_str() );
+      FILE* fid = fopen( fcsv.c_str(), "r" );
+      if ( fid == NULL )
+      {
+         printf( "%s::%d The file %s could not be opened.\n", __FILE__, __LINE__, fcsv.c_str() );
+         exit( EXIT_FAILURE );
+      }
+
+      int num_bsol = 0, len_bsol = 0, num_codes = 0, code, code_prev = -1, fbs_mem_size = 0;
+      char bsol[ 20 ];
+
+      // the first line of the csv file contains the names of the columns and must be ignored
+      int nreads = fscanf( fid, "%*[^\n]\n" );
+      if ( nreads == EOF )
+      {
+         printf( "%s::%d The file %s is empty.\n", __FILE__, __LINE__, fcsv.c_str() );
+         exit( EXIT_FAILURE );
+      }
+
+      // count nodes and edges.
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%*[^\n]\n", &code, &len_bsol, bsol ) )
+      {
+         ++num_bsol;
+         if ( code != code_prev )
+         {
+            num_codes++;
+            code_prev = code;
+         }
+         fbs_mem_size += len_bsol;
+      }
+
+      if ( verbose )
+      {
+         printf( "   FBS: num_bsol = %d\n", num_bsol );
+      }
+
+      // read edges
+      rewind( fid ); // back to file begin
+
+      // the first line of the csv file contains the names of the columns and must be ignored
+      nreads = fscanf( fid, "%*[^\n]\n" );
+      if ( nreads == EOF )
+      {
+         printf( "%s::%d The file %s is empty.\n", __FILE__, __LINE__, fcsv.c_str() );
+         exit( EXIT_FAILURE );
+      }
+
+      m_fbs_code = (bool*)malloc( fbs_mem_size * sizeof( bool ) );
+      m_fbs_ivec = (int*)malloc( ( ( 2 * num_codes ) + 1 ) * sizeof( int ) );
+
+      fbs_mem_size = 0;
+      while ( EOF != fscanf( fid, "%d,%d,%[^,],%*[^\n]\n", &code, &len_bsol, bsol ) )
+      {
+         ++num_bsol;
+         if ( code != code_prev )
+         {
+            m_fbs_ivec[ 2 * code ] = fbs_mem_size;
+            m_fbs_ivec[ 2 * code + 1 ] = len_bsol;
+            code_prev = code;
+         }
+         for ( int k = 0; k < len_bsol; ++k )
+            m_fbs_code[ fbs_mem_size++ ] = ( bsol[ k ] == '1' );
+      }
+      m_fbs_ivec[ 2 * ( code + 1 ) ] = fbs_mem_size;
+
+      fclose( fid );
    }
 
    void init_x()
@@ -297,8 +375,7 @@ public:
             m_edges[ m_nedges++ ] = edge;
       }
 
-      m_times = (double*)malloc( m_nedges * sizeof( double ) );
-      m_is_independent = (bool*)malloc( m_nedges * sizeof( bool ) );
+      m_timers = (double*)malloc( m_nedges * sizeof( double ) );
    }
 
    // Returns the (index) root associated to the vertex i cluster.
@@ -327,54 +404,55 @@ public:
       m_root[ i ] = r;
    }
 
-   void save_coords( std::string fname, std::string solution_dir, bool verbose = false )
-   {
+   void save_coords( std::string fname, bool verbose = false )
+   {      
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
       std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, solution_dir.c_str() );
-      strcat( fsol, "/" );
-      strcat( fsol, just_fname.c_str() );
+      strcpy( fsol, just_fname.c_str() );            
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
       sprintf( p, ".sol" );                     // replace suffix
 
       if ( verbose )
-         printf( "SBBU: saving solution on %s\n", fsol );
-      
+      {
+         printf( "Saving coords to %s\n.", fsol );
+      }
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
       for ( auto k = 0; k < m_nnodes; ++k )
          fprintf( fid, "%.18g %.18g %.18g\n", m_x[ 3 * k ], m_x[ 3 * k + 1 ], m_x[ 3 * k + 2 ] );
-            
+
       fclose( fid );
    }
 
-   void save_edge_time(std::string fname, std::string solution_dir, bool verbose = false)
+   void save_edge_timers( std::string fname, bool verbose = false )
    {
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
       std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, solution_dir.c_str() );
-      strcat( fsol, "/" );
-      strcat( fsol, just_fname.c_str() );
+      strcpy( fsol, just_fname.c_str() );
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
-      sprintf( p, "_edge_times.csv" );                     // replace suffix
+      sprintf( p, "_timers.csv" );         // replace suffix
 
       if ( verbose )
-         printf( "SBBU: saving solution on %s\n", fsol );
-      
+      {
+         printf( "Saving timers to %s\n.", fsol );
+      }
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
       fprintf( fid, "i,j,edge_time,is_independent\n" );
       for ( auto k = 0; k < m_nedges; ++k )
-         fprintf( fid, "%d,%d,%.18g,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_times[ k ], m_is_independent[ k ] );
-            
+      {
+         const int is_independent = m_edges[ k ].m_code >= 0 ? 1 : 0;
+         fprintf( fid, "%d,%d,%.18g,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], is_independent );
+      }
+
       fclose( fid );
    }
 
@@ -400,7 +478,8 @@ public:
             // update the best solution
             for ( int i = 0; i <= kmax; ++i )
                m_fopt[ i ] = m_f[ i ];
-            // break;
+            if ( m_dfs_all )
+               break;
          }
 
          if ( k == kmax ) // backtrack
@@ -455,13 +534,40 @@ public:
       }
    }
 
-   double fbs_traverse()
+   double fbs_traverse( const edge_t& edge, cluster_t& cr )
    {
+      const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
+      const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
+      double* xi = &m_x[ 3 * edge.m_i ];
+      double* xj = &m_x[ 3 * edge.m_j ];
+
       double eij = 0.0;
-      return eij;
+      double eij_min = m_dtol;
+
+      int k;
+      for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax; k += bsol_size )
+      {
+         const bool* f = &m_fbs_code[ k ];
+         cr.reflect( f, m_n, xj ); // updates x
+         eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
+
+         // solution found
+         if ( eij < eij_min )
+         {
+            eij_min = eij;
+            // update the best solution
+            for ( int i = 0; i < bsol_size; ++i )
+               m_fopt[ i ] = f[ i ];
+            break;
+         }
+      }
+
+      vec3_copy( xj, cr.m_y );
+
+      return eij_min;
    }
 
-   void solve_edge( const edge_t& edge )
+   void solve_edge( const edge_t& edge, bool fbs_active, int edge_id )
    {
       // init x[k,:], for k in edge.i, edge.i+1, ..., m_j[m_j[edge.i]]
       int r = find_root( edge.m_i + 3 );
@@ -509,7 +615,7 @@ public:
          // root of the next cluster
          k = find_root( k - m_root[ k ] );
          ck = &m_c[ k ];
-         
+
          // if ( omp_get_wtime() - tic > my_tmax )
          //    throw std::runtime_error( "LA SBBU: time exceeded (tmax = " + std::to_string( my_tmax ) + ")." );
       }
@@ -517,7 +623,15 @@ public:
       cr.create_planes( edge.m_j, m_d, m_n );
 
       // searching
-      double eij = dfs_traverse( edge, cr );
+      double eij = 0.0;
+      // counting the time to solve the k-th edge
+      double tic_edge = omp_get_wtime();
+      if ( fbs_active && edge.m_code >= 0 )
+         eij = fbs_traverse( edge, cr );
+      else
+         eij = dfs_traverse( edge, cr );
+      m_timers[ edge_id ] = omp_get_wtime() - tic_edge;
+
       if ( eij > m_dtol ) // edges of range 4 allways have two solutions
       {
          char msg[ 256 ];
@@ -557,7 +671,7 @@ public:
       qsort( edges, nedges, sizeof( edge_t ), cmp_edges );
    }
 
-   void solve( double tmax, bool verbose = false )
+   void solve( double tmax, bool fbs_active = false, bool verbose = false )
    {
       if ( verbose )
       {
@@ -575,21 +689,19 @@ public:
       for ( int k = 0; k < m_nedges; ++k )
       {
          // printf( "SBBU: solving edge %d\n", k );
-         const auto& edge = m_edges[ k ];
+         auto& edge = m_edges[ k ];
 
          // checking if the k-th edge is 'independent'
-         bool is_independent = true;
          for ( int i = edge.m_i + 3; i <= edge.m_j; ++i )
          {
-            if (m_root[ i ] != -1)
-               is_independent = false;
+            if ( m_root[ i ] != -1 )
+            {
+               edge.m_code = -1;
+               break;
+            }
          }
-         m_is_independent[ k ] = is_independent;
-         
-         // counting the time to solve the k-th edge
-         double tic_edge = omp_get_wtime();
-         solve_edge( edge );
-         m_times[ k ] = omp_get_wtime() - tic_edge;
+
+         solve_edge( edge, fbs_active, k );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
 

@@ -29,4 +29,5 @@ public:
    double m_l; // distance lower bound
    double m_u; // distance upper bound
    int m_order = -1; // edge index in a "to-be-defined" edge ordering
+   int m_code = 0; // edge type
 };

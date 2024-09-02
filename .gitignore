@@ -35,3 +35,6 @@ sbbu/RESULTS/DATA_EPSD_00_DMAX_60.log
 solvers/sbbu/sbbu_dbg.exe
 dmdgp_HA9H/**
 dmdgp_HA9H_sbbu/**
+df_train.pkl
+df_train.csv
+test_files.txt
