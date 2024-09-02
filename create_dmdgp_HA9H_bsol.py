@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
 
 
 dmdgp_HA9H_sbbu = "dmdgp_HA9H_sbbu"
@@ -76,5 +77,11 @@ def process_file(fn_csv):
 
 if __name__ == "__main__":
     files = os.listdir(dmdgp_HA9H)
-    for fn in tqdm(files):
-        process_file(fn)
+
+    # Set the desired number of worker processes
+    num_workers = os.cpu_count() - 1
+
+    # Use ProcessPoolExecutor with the specified number of worker processes
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        # Use tqdm to show progress while processing files in parallel
+        list(tqdm(executor.map(process_file, files), total=len(files)))

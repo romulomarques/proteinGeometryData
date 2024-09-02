@@ -20,8 +20,11 @@ int main(int argc, char *argv[])
     sbbu.solve(tmax);
     
     // defining directory to save the results
-    std::string sol_dir = std::string("dmdgp_HA9H_sbbu");
-    sbbu.save(fname, sol_dir);
+    // std::string sol_dir = std::string("/home/romulosmarques/Projects/proteinGeometryData/dmdgp_HA9H_sbbu");
+    // sbbu.save_coords(fname, sol_dir);
+
+    std::string sol_dir = std::string("/home/romulosmarques/Projects/proteinGeometryData");
+    sbbu.save_edge_time( fname, sol_dir );
     
     return EXIT_SUCCESS;
 }

@@ -16,19 +16,20 @@ class nmr_t
 public:
    nmr_t() {}
 
-   nmr_t( std::string fnmr, double dtol, bool is_csv )
+   nmr_t( std::string fnmr, double dtol, bool is_csv, bool verbose = false )
    {
       if ( is_csv )
-         read_csv( fnmr, dtol );
+         read_csv( fnmr, dtol, verbose );
       else
-         read_nmr( fnmr, dtol );
+         read_nmr( fnmr, dtol, verbose );
    }
 
-   void read_nmr( std::string fnmr, double dtol )
+   void read_nmr( std::string fnmr, double dtol, bool verbose = false )
    {
       m_fnmr = fnmr;
       m_dtol = dtol;
-      printf( "Reading file %s\n", fnmr.c_str() );
+      if ( verbose )
+         printf( "Reading file %s\n", fnmr.c_str() );
       FILE* fid = fopen( fnmr.c_str(), "r" );
       if ( fid == NULL )
       {
@@ -48,8 +49,12 @@ public:
          m_nnodes = MAX( m_nnodes, i );
          m_nnodes = MAX( m_nnodes, j );
       }
-      printf( "   NMR: nnodes = %d\n", m_nnodes );
-      printf( "   NMR: nedges = %d\n", m_nedges );
+      if ( verbose )
+      {
+         printf( "   NMR: nnodes = %d\n", m_nnodes );
+         printf( "   NMR: nedges = %d\n", m_nedges );
+      }
+      
 
       // read edges
       rewind( fid ); // back to file begin
@@ -94,11 +99,12 @@ public:
       }
    }
 
-   void read_csv( std::string fcsv, double dtol )
+   void read_csv( std::string fcsv, double dtol, bool verbose = false )
    {
       m_fnmr = fcsv;
       m_dtol = dtol;
-      printf( "Reading file %s\n", fcsv.c_str() );
+      if ( verbose )
+         printf( "Reading file %s\n", fcsv.c_str() );
       FILE* fid = fopen( fcsv.c_str(), "r" );
       if ( fid == NULL )
       {
@@ -127,8 +133,11 @@ public:
          m_nnodes = MAX( m_nnodes, i );
          m_nnodes = MAX( m_nnodes, j );
       }
-      printf( "   NMR: nnodes = %d\n", m_nnodes );
-      printf( "   NMR: nedges = %d\n", m_nedges );
+      if ( verbose )
+      {
+         printf( "   NMR: nnodes = %d\n", m_nnodes );
+         printf( "   NMR: nedges = %d\n", m_nedges );
+      }
 
       // read edges
       rewind( fid ); // back to file begin

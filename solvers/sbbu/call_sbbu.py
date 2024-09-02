@@ -1,77 +1,48 @@
 import os
 import subprocess
-import pandas as pd
+from tqdm import tqdm
 
-def run_cmd(cmd):
-    output = [cmd + '\n']
-    print(cmd)
+def run_sbbu(sbbu_dir, dmdgp_dir, instance_file):
+    # Construct the path to the sbbu.exe
+    exe_path = os.path.join(sbbu_dir, "sbbu.exe")
+
+    # # Check if the sbbu.exe exists
+    # if not os.path.isfile(exe_path):
+    #     print(f"Error: {exe_path} does not exist.")
+    #     return
+
+    # Construct the path to the instance file
+    instance_path = os.path.join(dmdgp_dir, instance_file)
+
+    # print(f"Running sbbu.exe with instance {instance_file}...")
     try:
-        if os.name == 'nt':  # windows
-            cmd_out = subprocess.check_output(cmd, shell=True).decode('windows-1252')
-        else:  # unix
-            cmd_out = subprocess.check_output(cmd, shell=True).decode('utf-8')
-        cmd_out = cmd_out.split('\n')
-        for line in cmd_out:
-            print(line)
-            output.append(line + '\n')
+        # Run the sbbu.exe with the instance file as an argument
+        subprocess.run([exe_path, "-nmr", instance_path, "-tmax", "300"], cwd=sbbu_dir, check=True)
+        # print(f"Finished running sbbu.exe with instance {instance_file}")
     except subprocess.CalledProcessError as e:
-        print(e)
-    return output
+        print(f"Error running sbbu.exe with instance {instance_file}: {e}")
 
+def main():
+    # Specify the path to the root directory
+    root_dir = "/home/romulosmarques/Projects/proteinGeometryData/"
 
-def create_table(flog):
-    with open(flog, 'r') as fid:
-        data = fid.readlines()
+    # Specify the path to the dmdgp_HA9H directory
+    dmdgp_dir = os.path.join(root_dir, "dmdgp_HA9H")
 
-    df = {'pid': [], 'nnodes': [], 'nedges': [], 'tsec': [], 'mde': [], 'lde': []}
-    for row in data:
-        if 'Reading file' in row:
-            pid = row.split('/')[-1].split('.')[0]
-            for col in df:
-                df[col].append(None)
-            df['pid'][-1] = pid
-        if 'NMR: nnodes' in row:
-            df['nnodes'][-1] = int(row.split()[-1])
-        if 'NMR: nedges' in row:
-            # edges (i, j) and (j, i) are included (duplicated)
-            df['nedges'][-1] = int(int(row.split()[-1]) / 2)
-        if 'MDE' in row and 'LDE' in row:
-            df['mde'][-1] = float(row.split()[3].replace(',', ''))
-            df['lde'][-1] = float(row.split()[-1])
-        if 'solution found after' in row:
-            df['tsec'][-1] = float(row.split()[-2])
+    # Specify the path to the sbbu directory
+    sbbu_dir = os.path.join(root_dir, "solvers", "sbbu")
+    
 
-    df = pd.DataFrame.from_dict(df)
-    ftab = flog.replace('.log', '.csv')
-    print('\nTABLE ' + ftab)
-    print(df)
-    df.to_csv(ftab)
+    # # Check if the sbbu directory exists
+    # if not os.path.isdir(sbbu_dir):
+    #     print(f"Error: {sbbu_dir} does not exist.")
+    #     return
+    
+    # List all files in the dmdgp_HA9H directory
+    for filename in tqdm(os.listdir(dmdgp_dir)):
+        # Check if the file is an instance file (e.g., ends with .csv)
+        if filename.endswith(".csv"):
+            run_sbbu(sbbu_dir, dmdgp_dir, filename)
 
 if __name__ == "__main__":
-    tmax = 300
-    WDIR = ['/home/michael/gitrepos/rs_ROMULO/dmdgp_HA9H']
-    solver = '/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/sbbu.exe'
-    for wdir in WDIR:
-        FILES = []
-        for fname in os.listdir(wdir):
-            fname = os.path.join(wdir, fname)
-            if fname.endswith('.nmr') or fname.endswith('.csv'):
-                FILES.append({'name': fname, 'size': os.path.getsize(fname)})
-        FILES = sorted(FILES, key=lambda x: x['size'])
-
-        output = []
-        for k in range(len(FILES)):
-            f = FILES[k]
-            print('[%2d/%2d] %d : %s' % (k+1, len(FILES), f['size'], f['name']))
-            cmd = '%s -nmr %s -tmax %f' % (solver, f['name'], tmax)
-            output += run_cmd(cmd)
-
-        # create log file
-        flog = wdir + '.log'
-        print('saving file ' + flog)
-        with open(flog, 'w') as fid:
-            for row in output:
-                fid.write(row)
-
-        # create table of results
-        create_table(wdir + '.log')
+    main()

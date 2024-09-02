@@ -136,6 +136,8 @@ public:
    cluster_t* m_c;
    double m_dtol;
    int m_j; // last solved node
+   double* m_times; // time spent to solve each edge
+   bool* m_is_independent; // indicates which edges are "independents"
 
    sbbu_t( ddgp_t& dgp, double dtol, int imax )
        : m_dgp( dgp )
@@ -179,6 +181,8 @@ public:
       free( m_plane_a );
       free( m_plane_n );
       free( m_plane_w );
+      free( m_times );
+      free( m_is_independent );
    }
 
    void init_x()
@@ -292,6 +296,9 @@ public:
          if ( edge.m_j - edge.m_i > 3 )
             m_edges[ m_nedges++ ] = edge;
       }
+
+      m_times = (double*)malloc( m_nedges * sizeof( double ) );
+      m_is_independent = (bool*)malloc( m_nedges * sizeof( bool ) );
    }
 
    // Returns the (index) root associated to the vertex i cluster.
@@ -320,7 +327,7 @@ public:
       m_root[ i ] = r;
    }
 
-   void save( std::string fname, std::string solution_dir )
+   void save_coords( std::string fname, std::string solution_dir, bool verbose = false )
    {
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
@@ -333,12 +340,41 @@ public:
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
       sprintf( p, ".sol" );                     // replace suffix
 
-      printf( "SBBU: saving solution on %s\n", fsol );
+      if ( verbose )
+         printf( "SBBU: saving solution on %s\n", fsol );
+      
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
       for ( auto k = 0; k < m_nnodes; ++k )
          fprintf( fid, "%.18g %.18g %.18g\n", m_x[ 3 * k ], m_x[ 3 * k + 1 ], m_x[ 3 * k + 2 ] );
+            
+      fclose( fid );
+   }
+
+   void save_edge_time(std::string fname, std::string solution_dir, bool verbose = false)
+   {
+      size_t i_last_delimitator = fname.find_last_of( '/' );
+      std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
+      std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
+
+      char fsol[ FILENAME_MAX ];
+      strcpy( fsol, solution_dir.c_str() );
+      strcat( fsol, "/" );
+      strcat( fsol, just_fname.c_str() );
+      char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
+      sprintf( p, "_edge_times.csv" );                     // replace suffix
+
+      if ( verbose )
+         printf( "SBBU: saving solution on %s\n", fsol );
+      
+      FILE* fid = fopen( fsol, "w" );
+      if ( fid == NULL )
+         throw std::runtime_error( "The solution file could not be created." );
+      fprintf( fid, "i,j,edge_time,is_independent\n" );
+      for ( auto k = 0; k < m_nedges; ++k )
+         fprintf( fid, "%d,%d,%.18g,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_times[ k ], m_is_independent[ k ] );
+            
       fclose( fid );
    }
 
@@ -452,6 +488,8 @@ public:
       // create d :: vector of decisions
       m_n = 0; // number of decisions to be taken
       cluster_t* ck = &cr;
+      // double tic = omp_get_wtime();
+      // double my_tmax = 60;
       for ( int k = r; ck->m_i <= edge.m_j; )
       {
          merge_cluster( k, r );
@@ -465,12 +503,15 @@ public:
          m_f[ m_n++ ] = false;
 
          // last feasible cluster
-         if ( ck->m_j + 1 == m_nnodes )
+         if ( k - m_root[ k ] == m_nnodes )
             break;
 
          // root of the next cluster
          k = find_root( k - m_root[ k ] );
          ck = &m_c[ k ];
+         
+         // if ( omp_get_wtime() - tic > my_tmax )
+         //    throw std::runtime_error( "LA SBBU: time exceeded (tmax = " + std::to_string( my_tmax ) + ")." );
       }
 
       cr.create_planes( edge.m_j, m_d, m_n );
@@ -516,12 +557,15 @@ public:
       qsort( edges, nedges, sizeof( edge_t ), cmp_edges );
    }
 
-   void solve( double tmax )
+   void solve( double tmax, bool verbose = false )
    {
-      printf( "SBBU: tmax = %g\n", tmax );
-      printf( "SBBU: dtol = %g\n", m_dtol );
-      printf( "SBBU: imax = %g\n", (double)m_imax );
-      printf( "SBBU: prune_edges = %d\n", m_nedges );
+      if ( verbose )
+      {
+         printf( "SBBU: tmax = %g\n", tmax );
+         printf( "SBBU: dtol = %g\n", m_dtol );
+         printf( "SBBU: imax = %g\n", (double)m_imax );
+         printf( "SBBU: prune_edges = %d\n", m_nedges );
+      }
 
       sort_edges_by_order( m_edges, m_nedges );
 
@@ -532,18 +576,33 @@ public:
       {
          // printf( "SBBU: solving edge %d\n", k );
          const auto& edge = m_edges[ k ];
+
+         // checking if the k-th edge is 'independent'
+         bool is_independent = true;
+         for ( int i = edge.m_i + 3; i <= edge.m_j; ++i )
+         {
+            if (m_root[ i ] != -1)
+               is_independent = false;
+         }
+         m_is_independent[ k ] = is_independent;
+         
+         // counting the time to solve the k-th edge
+         double tic_edge = omp_get_wtime();
          solve_edge( edge );
+         m_times[ k ] = omp_get_wtime() - tic_edge;
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
 
          // assert_partial_feasibility( edge.m_order );
       }
       double toc = omp_get_wtime() - tic;
-      printf( "SBBU: solution found after %g secs\n", toc );
+      if ( verbose )
+         printf( "SBBU: solution found after %g secs\n", toc );
 
       init_x( m_nnodes - 1 );
       m_dgp.assert_feasibility( m_x );
 
-      printf( "SBBU: MDE = %g, LDE = %g\n", m_dgp.mde( m_x ), m_dgp.lde( m_x ) );
+      if ( verbose )
+         printf( "SBBU: MDE = %g, LDE = %g\n", m_dgp.mde( m_x ), m_dgp.lde( m_x ) );
    }
 };

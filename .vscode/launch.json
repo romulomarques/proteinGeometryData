@@ -33,7 +33,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/solvers/sbbu/sbbu_dbg.exe",
             "args": [
-                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1wj5_model1_chainA_segment5.csv",
+                "-nmr", "${workspaceFolder}/dmdgp_HA9H/2n62_model1_chainL_segment6.csv",
                 "-tmax", "3600"
             ],
             "stopAtEntry": true,
