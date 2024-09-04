@@ -18,18 +18,16 @@ def run_sbbu(sbbu_dir, dmdgp_dir, out_dir, instance_file):
         raise FileNotFoundError(f"Error: {instance_path} does not exist.")
 
     try:
-        # Run the sbbu.exe with the instance file as an argument
-        subprocess.run(
-            [exe_path, "-nmr", instance_path, "-tmax", "300", "-dfs_all", '1', "-outdir", out_dir], cwd=sbbu_dir, check=True
-        )
-        # print(f"Finished running sbbu.exe with instance {instance_file}")
+        cmd = f'{exe_path} -nmr "{instance_path}" -tmax 300 -dfs_all 1 -outdir "{out_dir}"'
+        subprocess.run(cmd, shell=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error running sbbu.exe with instance {instance_file}: {e}")
+        print(f"Error: {e}")
 
 
 def main():
     # Specify the path to the root directory
-    root_dir = "/home/romulosmarques/Projects/proteinGeometryData"
+    # root_dir = "/home/romulosmarques/Projects/proteinGeometryData"
+    root_dir = "/home/michael/gitrepos/rs_ROMULO"
 
     # Specify the path to the dmdgp_HA9H directory
     dmdgp_dir = os.path.join(root_dir, "dmdgp_HA9H")

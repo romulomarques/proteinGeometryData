@@ -47,19 +47,15 @@ def get_edge_type(row: pd.Series) -> str:
     return f"{row['i_name']}{int(row['j']) - int(row['i'])}{row['j_name']}"
 
 
-def get_repetition_indexes(fname):
-    df = pd.read_csv(fname)
+def get_repetition_indexes(fn_dmdgp):
+    df = pd.read_csv(fn_dmdgp)
     return df[df["dij"] == 0.0]["j"].to_list()
 
 
-def flip_bsol(bsol: list, repetitions: list) -> List[int]:
-    # ensure that bsol[3] == 1
-    if bsol[3] == 0:
-        bsol[3:] = 1 - bsol[3:]
-    # ensure that repeated vertices have bit 0
-    for i in repetitions:
-        bsol[i] = 0
-
+def flip_bsol(bsol: str) -> str:
+    # flip all the bits if the first bit is 1
+    if bsol[0] == "1":
+        bsol = "".join(["1" if bit == "0" else "0" for bit in bsol])
     return bsol
 
 
@@ -117,9 +113,7 @@ def save_pkl(fname: str, df: pd.DataFrame):
 
 
 def save_train_test(df_train: pd.DataFrame, test_files: list):
-    df_train = df_train[["code","len_bsol","bsol","type","count","total","relfreq"]]
-
-    # saving the file names of the test files    
+    # saving the file names of the test files
     fn_txt = "test_files.txt"
     print(f"Saving the test files in {fn_txt}")
     with open(fn_txt, "w") as f:
@@ -134,20 +128,41 @@ def save_train_test(df_train: pd.DataFrame, test_files: list):
 
 
 if __name__ == "__main__":
-    fname = "dmdgp_HA9H_sbbu/9pcy_model1_chainA_segment9.csv"
-    repetitions = get_repetition_indexes(fname)
-    print("Arroz")
+    random_state = 42
+    train_files, test_files = bsol_split_train_test(random_state)
+    # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
+    train_files = [
+        os.path.join(wd_dmdgp_HA9A_sbbu, fn)
+        for fn in train_files
+        if fn.endswith(".csv")
+    ]
+    df = collect_all_bsol_data(train_files)
+    df_train = df[
+        (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
+    ]
 
-    # random_state = 42
-    # train_files, test_files = bsol_split_train_test(random_state)
-    # # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
-    # train_files = [
-    #     os.path.join(wd_dmdgp_HA9A_sbbu, fn)
-    #     for fn in train_files
-    #     if fn.endswith(".csv")
-    # ]
-    # df = collect_all_bsol_data(train_files)
-    # df_filtered = df[
-    #     (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
-    # ]
-    # save_train_test(df_filtered, test_files)
+    # keep only the relevant columns
+    df_train = df_train[
+        ["code", "len_bsol", "bsol", "type", "count", "total", "relfreq"]
+    ]
+
+    # combining the symmetric bsol values
+    df_train["bsol"] = df_train["bsol"].apply(lambda x: flip_bsol(x))
+    df_train = (
+        df_train.groupby(["bsol"])
+        .agg(
+            {
+                "code": "first",
+                "len_bsol": "first",
+                "type": "first",
+                "count": "sum",
+                "total": "first",
+                "relfreq": "sum",
+            }
+        )
+        .reset_index()
+    )
+
+    df_train.sort_values(["code", "relfreq"], ascending=[True, False], inplace=True)
+
+    save_train_test(df_train, test_files)
