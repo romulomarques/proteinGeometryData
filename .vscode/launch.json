@@ -35,7 +35,10 @@
             "args": [
                 "-nmr", "${workspaceFolder}/dmdgp_HA9H/1gwp_model1_chainA_segment10.csv",
                 "-tmax", "3600",
-                "-fbs", "0"
+                "-dtol", "1e-5",
+                "-fbs", "1",
+                "-dfs_all", "0",
+                "-outdir", "${workspaceFolder}/results/fbs"
             ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
@@ -60,7 +63,11 @@
             "program": "${workspaceFolder}/solvers/sbbu/sbbu.exe",
             "args": [
                 "-nmr", "${workspaceFolder}/dmdgp_HA9H/1wj5_model1_chainA_segment5.csv",
-                "-tmax", "3600"
+                "-tmax", "3600",
+                "-dtol", "1e-5",
+                "-fbs", "0",
+                "-dfs_all", "1",
+                "-outdir", "${workspaceFolder}/dmdgp_HA9H_sbbu"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

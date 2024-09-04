@@ -38,3 +38,5 @@ dmdgp_HA9H_sbbu/**
 df_train.pkl
 df_train.csv
 test_files.txt
+results/dfs/**
+results/fbs/**

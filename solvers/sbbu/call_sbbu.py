@@ -3,7 +3,7 @@ import subprocess
 from tqdm import tqdm
 
 
-def run_sbbu(sbbu_dir, dmdgp_dir, instance_file):
+def run_sbbu(sbbu_dir, dmdgp_dir, out_dir, instance_file):
     # Construct the path to the sbbu.exe
     exe_path = os.path.join(sbbu_dir, "sbbu.exe")
 
@@ -20,7 +20,7 @@ def run_sbbu(sbbu_dir, dmdgp_dir, instance_file):
     try:
         # Run the sbbu.exe with the instance file as an argument
         subprocess.run(
-            [exe_path, "-nmr", instance_path, "-tmax", "300"], cwd=sbbu_dir, check=True
+            [exe_path, "-nmr", instance_path, "-tmax", "300", "-dfs_all", '1', "-outdir", out_dir], cwd=sbbu_dir, check=True
         )
         # print(f"Finished running sbbu.exe with instance {instance_file}")
     except subprocess.CalledProcessError as e:
@@ -29,10 +29,13 @@ def run_sbbu(sbbu_dir, dmdgp_dir, instance_file):
 
 def main():
     # Specify the path to the root directory
-    root_dir = "/home/michael/gitrepos/rs_ROMULO/"
+    root_dir = "/home/romulosmarques/Projects/proteinGeometryData"
 
     # Specify the path to the dmdgp_HA9H directory
     dmdgp_dir = os.path.join(root_dir, "dmdgp_HA9H")
+
+    # Specify the path to the output directory
+    out_dir = os.path.join(root_dir, "dmdgp_HA9H_sbbu")
 
     # Specify the path to the sbbu directory
     sbbu_dir = os.path.join(root_dir, "solvers", "sbbu")
@@ -45,7 +48,7 @@ def main():
     for filename in tqdm(os.listdir(dmdgp_dir)):
         # Check if the file is an instance file (e.g., ends with .csv)
         if filename.endswith(".csv"):
-            run_sbbu(sbbu_dir, dmdgp_dir, filename)
+            run_sbbu(sbbu_dir, dmdgp_dir, out_dir, filename)
 
 
 if __name__ == "__main__":

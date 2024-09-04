@@ -159,7 +159,7 @@ public:
       select_prune_edges();
 
       // init fbs
-      read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
+      read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
 
       // init m_x;
       m_x = (double*)malloc( 3 * m_nnodes * sizeof( double ) );
@@ -404,14 +404,16 @@ public:
       m_root[ i ] = r;
    }
 
-   void save_coords( std::string fname, bool verbose = false )
+   void save_coords( std::string fname, std::string outdir, bool verbose = false )
    {      
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
       std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, just_fname.c_str() );            
+      strcpy( fsol, outdir.c_str() );
+      strcat( fsol, "/" );
+      strcat( fsol, just_fname.c_str() );            
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
       sprintf( p, ".sol" );                     // replace suffix
 
@@ -428,14 +430,16 @@ public:
       fclose( fid );
    }
 
-   void save_edge_timers( std::string fname, bool verbose = false )
+   void save_edge_timers( std::string fname, std::string outdir, bool verbose = false )
    {
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
       std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, just_fname.c_str() );
+      strcpy( fsol, outdir.c_str() );
+      strcat( fsol, "/" );
+      strcat( fsol, just_fname.c_str() );
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
       sprintf( p, "_timers.csv" );         // replace suffix
 
@@ -478,7 +482,7 @@ public:
             // update the best solution
             for ( int i = 0; i <= kmax; ++i )
                m_fopt[ i ] = m_f[ i ];
-            if ( m_dfs_all )
+            if ( ! m_dfs_all )
                break;
          }
 
