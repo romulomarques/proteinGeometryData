@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 import pickle
 from sklearn.model_selection import train_test_split
 from create_dmdgp_HA9H_order import set_edges_code
+from typing import Tuple, List
 
 wd_dmdgp_HA9A_sbbu = "dmdgp_HA9H_sbbu"
 
@@ -44,6 +45,22 @@ def bsol_split_train_test(random_state):
 
 def get_edge_type(row: pd.Series) -> str:
     return f"{row['i_name']}{int(row['j']) - int(row['i'])}{row['j_name']}"
+
+
+def get_repetition_indexes(fname):
+    df = pd.read_csv(fname)
+    return df[df["dij"] == 0.0]["j"].to_list()
+
+
+def flip_bsol(bsol: list, repetitions: list) -> List[int]:
+    # ensure that bsol[3] == 1
+    if bsol[3] == 0:
+        bsol[3:] = 1 - bsol[3:]
+    # ensure that repeated vertices have bit 0
+    for i in repetitions:
+        bsol[i] = 0
+
+    return bsol
 
 
 def count_bsol(fname: str) -> pd.DataFrame:
@@ -117,19 +134,20 @@ def save_train_test(df_train: pd.DataFrame, test_files: list):
 
 
 if __name__ == "__main__":
-    # fname = "dmdgp_HA9H_sbbu/9pcy_model1_chainA_segment9.csv"
-    # count_bsol(fname)
+    fname = "dmdgp_HA9H_sbbu/9pcy_model1_chainA_segment9.csv"
+    repetitions = get_repetition_indexes(fname)
+    print("Arroz")
 
-    random_state = 42
-    train_files, test_files = bsol_split_train_test(random_state)
-    # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
-    train_files = [
-        os.path.join(wd_dmdgp_HA9A_sbbu, fn)
-        for fn in train_files
-        if fn.endswith(".csv")
-    ]
-    df = collect_all_bsol_data(train_files)
-    df_filtered = df[
-        (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
-    ]
-    save_train_test(df_filtered, test_files)
+    # random_state = 42
+    # train_files, test_files = bsol_split_train_test(random_state)
+    # # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
+    # train_files = [
+    #     os.path.join(wd_dmdgp_HA9A_sbbu, fn)
+    #     for fn in train_files
+    #     if fn.endswith(".csv")
+    # ]
+    # df = collect_all_bsol_data(train_files)
+    # df_filtered = df[
+    #     (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
+    # ]
+    # save_train_test(df_filtered, test_files)
