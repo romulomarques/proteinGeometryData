@@ -139,39 +139,47 @@ public:
    double* m_timers; // time spent to solve each edge
    bool* m_fbs_code; // fbs code = [j, bsol], where j is the index where to overwrite the previous solution
    int* m_fbs_ivec;  // start index of fbs solutions
+   bool m_fbs_active; // fbs active
    bool m_dfs_all;   // all possible configurations will be checked in dfs_traverse
 
-   sbbu_t( ddgp_t& dgp, double dtol, int imax, bool dfs_all )
+   sbbu_t( ddgp_t& dgp, double dtol, int imax, bool dfs_all, bool fbs_active )
        : m_dgp( dgp )
    {
       m_nnodes = dgp.m_nnodes;
       m_dtol = dtol;
       m_imax = imax;
       m_dfs_all = dfs_all;
-      m_d = (int*)malloc( m_nnodes * sizeof( int ) );
-      m_f = (bool*)malloc( m_nnodes * sizeof( bool ) );
-      m_fopt = (bool*)malloc( m_nnodes * sizeof( bool ) );
-      m_plane_n = (double*)malloc( 3 * dgp.m_nnodes * sizeof( double ) );
-      m_plane_a = (double*)malloc( 3 * dgp.m_nnodes * sizeof( double ) );
-      m_plane_w = (double*)malloc( dgp.m_nnodes * sizeof( double ) );
+      m_fbs_active = fbs_active;
+      m_d = (int*)calloc( m_nnodes, sizeof( int ) );
+      m_f = (bool*)calloc( m_nnodes, sizeof( bool ) );
+      m_fopt = (bool*)calloc( m_nnodes, sizeof( bool ) );
+      m_plane_n = (double*)calloc( 3 * dgp.m_nnodes, sizeof( double ) );
+      m_plane_a = (double*)calloc( 3 * dgp.m_nnodes, sizeof( double ) );
+      m_plane_w = (double*)calloc( dgp.m_nnodes, sizeof( double ) );
+      m_fbs_code = NULL;
+      m_fbs_ivec = NULL;
 
       // init (prune) edges
       select_prune_edges();
 
       // init fbs
-      read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
+      if( fbs_active )
+      {
+         // read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
+         read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
+      }
 
       // init m_x;
-      m_x = (double*)malloc( 3 * m_nnodes * sizeof( double ) );
+      m_x = (double*)calloc( 3 * m_nnodes, sizeof( double ) );
       init_x();
 
       // init m_c
-      m_c = (cluster_t*)malloc( m_nnodes * sizeof( cluster_t ) );
+      m_c = (cluster_t*)calloc( m_nnodes, sizeof( cluster_t ) );
       for ( int k = 0; k < m_nnodes; ++k )
          init_c( k, dgp );
 
       // init m_root
-      m_root = (int*)malloc( m_nnodes * sizeof( int ) );
+      m_root = (int*)calloc( m_nnodes, sizeof( int ) );
       for ( int k = 0; k < m_nnodes; ++k )
          m_root[ k ] = -1;
    }
@@ -182,6 +190,7 @@ public:
       free( m_root );
       free( m_d );
       free( m_f );
+      free( m_fopt );
       free( m_c );
       free( m_x );
       free( m_plane_a );
@@ -242,8 +251,8 @@ public:
          exit( EXIT_FAILURE );
       }
 
-      m_fbs_code = (bool*)malloc( fbs_mem_size * sizeof( bool ) );
-      m_fbs_ivec = (int*)malloc( ( ( 2 * num_codes ) + 1 ) * sizeof( int ) );
+      m_fbs_code = (bool*)calloc( fbs_mem_size, sizeof( bool ) );
+      m_fbs_ivec = (int*)calloc( ( ( 2 * num_codes ) + 1 ), sizeof( int ) );
 
       fbs_mem_size = 0;
       while ( EOF != fscanf( fid, "%d,%d,%[^,],%*[^\n]\n", &code, &len_bsol, bsol ) )
@@ -273,7 +282,7 @@ public:
       vec3_set( &m_x[ 0 ], 0., 0., 0. );
       vec3_set( &m_x[ 3 ], d01, 0., 0. );
       vec3_set( &m_x[ 6 ], x20, x21, 0. );
-      m_j = 2;
+      m_j = 2;      
    }
 
    // init m_x[m_j+1:j] using BP distances
@@ -366,7 +375,7 @@ public:
          if ( edge.m_j - edge.m_i > 3 )
             m_nedges++;
       }
-      m_edges = (edge_t*)malloc( m_nedges * sizeof( edge_t ) );
+      m_edges = (edge_t*)calloc( m_nedges, sizeof( edge_t ) );
       m_nedges = 0;
       for ( int k = 0; k < m_dgp.m_nedges; ++k )
       {
@@ -375,7 +384,7 @@ public:
             m_edges[ m_nedges++ ] = edge;
       }
 
-      m_timers = (double*)malloc( m_nedges * sizeof( double ) );
+      m_timers = (double*)calloc( m_nedges, sizeof( double ) );
    }
 
    // Returns the (index) root associated to the vertex i cluster.

@@ -58,7 +58,7 @@ public:
 
       // read edges
       rewind( fid ); // back to file begin
-      m_edges = (edge_t*)malloc( m_nedges * sizeof( edge_t ) );
+      m_edges = (edge_t*)calloc( m_nedges, sizeof( edge_t ) );
 
       while ( EOF != fscanf( fid, "%d %d %lf %lf %s %s %s %s\n", &i, &j, &l, &u, iatom, jatom, iamino, jamino ) )
       {
@@ -152,7 +152,7 @@ public:
          exit( EXIT_FAILURE );
       }
 
-      m_edges = (edge_t*)malloc( m_nedges * sizeof( edge_t ) );
+      m_edges = (edge_t*)calloc( m_nedges, sizeof( edge_t ) );
 
       while ( EOF != fscanf( fid, "%d,%d,%[^,],%[^,],%lf,%d,%d\n", &i, &j, iatom, jatom, &l, &order, &code ) )
       {

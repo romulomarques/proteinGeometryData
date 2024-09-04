@@ -11,9 +11,9 @@ public:
    {
       // printf("%s::%d\n", __FILE__, __LINE__);
 
-      m_a2 = (double*)malloc( m_nnodes * sizeof( double ) );
-      m_b2 = (double*)malloc( m_nnodes * sizeof( double ) );
-      m_c2 = (double*)malloc( m_nnodes * sizeof( double ) );
+      m_a2 = (double*)calloc( m_nnodes, sizeof( double ) );
+      m_b2 = (double*)calloc( m_nnodes, sizeof( double ) );
+      m_c2 = (double*)calloc( m_nnodes, sizeof( double ) );
       double l, u;
       for ( int i = 0; i < m_nnodes; ++i )
       {
