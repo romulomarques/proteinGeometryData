@@ -453,11 +453,11 @@ public:
       strcat( fsol, "/" );
       strcat( fsol, just_fname.c_str() );
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
-      sprintf( p, "_timers.csv" );         // replace suffix
+      sprintf( p, ".csv" );         // replace suffix
 
       if ( verbose )
       {
-         printf( "Saving timers to %s\n.", fsol );
+         printf( "Saving measuremnts to %s\n.", fsol );
       }
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
