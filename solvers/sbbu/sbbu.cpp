@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
     
     // defining directory to save the results    
     sbbu.save_coords( fname, outdir, verbose );
-    // sbbu.save_edge_timers( fname, outdir, verbose );
+    sbbu.save_edge_measurements( fname, outdir, verbose );
     
     return EXIT_SUCCESS;
 }

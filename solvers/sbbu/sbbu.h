@@ -137,6 +137,7 @@ public:
    double m_dtol;
    int m_j;          // last solved node
    double* m_timers; // time spent to solve each edge
+   int* m_niters; // number of iterations to solve each edge
    bool* m_fbs_code; // fbs code = [j, bsol], where j is the index where to overwrite the previous solution
    int* m_fbs_ivec;  // start index of fbs solutions
    bool m_fbs_active; // fbs active
@@ -197,6 +198,7 @@ public:
       free( m_plane_n );
       free( m_plane_w );
       free( m_timers );
+      free( m_niters );
       free( m_fbs_code );
       free( m_fbs_ivec );
    }
@@ -385,6 +387,7 @@ public:
       }
 
       m_timers = (double*)calloc( m_nedges, sizeof( double ) );
+      m_niters = (int*)calloc( m_nedges, sizeof( int ) );
    }
 
    // Returns the (index) root associated to the vertex i cluster.
@@ -439,7 +442,7 @@ public:
       fclose( fid );
    }
 
-   void save_edge_timers( std::string fname, std::string outdir, bool verbose = false )
+   void save_edge_measurements( std::string fname, std::string outdir, bool verbose = false )
    {
       size_t i_last_delimitator = fname.find_last_of( '/' );
       std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
@@ -459,17 +462,17 @@ public:
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
-      fprintf( fid, "i,j,edge_time,is_independent\n" );
+      fprintf( fid, "i,j,edge_time,edge_niters,is_independent\n" );
       for ( auto k = 0; k < m_nedges; ++k )
       {
          const int is_independent = m_edges[ k ].m_code >= 0 ? 1 : 0;
-         fprintf( fid, "%d,%d,%.18g,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], is_independent );
+         fprintf( fid, "%d,%d,%.18g,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], is_independent );
       }
 
       fclose( fid );
    }
 
-   double dfs_traverse( const edge_t& edge, cluster_t& cr )
+   double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
    {
       const int kmax = m_n - 1;
       double* xi = &m_x[ 3 * edge.m_i ];
@@ -513,6 +516,8 @@ public:
 
       vec3_copy( xj, cr.m_y );
 
+      m_niters[ edge_id ] = niters;
+
       return eij_min;
    }
 
@@ -547,7 +552,7 @@ public:
       }
    }
 
-   double fbs_traverse( const edge_t& edge, cluster_t& cr )
+   double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
    {
       const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
       const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
@@ -556,12 +561,14 @@ public:
 
       double eij = 0.0;
       double eij_min = m_dtol;
+      int niters = 0;
 
       int k;
       for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax; k += bsol_size )
       {
          const bool* f = &m_fbs_code[ k ];
          cr.reflect( f, m_n, xj ); // updates x
+         ++niters;
          eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
 
          // solution found
@@ -576,6 +583,8 @@ public:
       }
 
       vec3_copy( xj, cr.m_y );
+
+      m_niters[ edge_id ] = niters;
 
       return eij_min;
    }
@@ -640,9 +649,9 @@ public:
       // counting the time to solve the k-th edge
       double tic_edge = omp_get_wtime();
       if ( fbs_active && edge.m_code >= 0 )
-         eij = fbs_traverse( edge, cr );
+         eij = fbs_traverse( edge, cr, edge_id );
       else
-         eij = dfs_traverse( edge, cr );
+         eij = dfs_traverse( edge, cr, edge_id );
       m_timers[ edge_id ] = omp_get_wtime() - tic_edge;
 
       if ( eij > m_dtol ) // edges of range 4 allways have two solutions
