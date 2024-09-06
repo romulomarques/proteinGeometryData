@@ -33,10 +33,12 @@
             "request": "launch",
             "program": "${workspaceFolder}/solvers/sbbu/sbbu_dbg.exe",
             "args": [
-                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1slj_model1_chainA_segment2.csv",
-                "-tmax", "3600",                
-                "-dfs_all", "1",
-                "-outdir", "${workspaceFolder}/dmdgp_HA9H_sbbu"
+                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1y7n_model1_chainA_segment7.csv",
+                "-tmax", "3600",
+                "-dtol", "1e-5",
+                "-fbs", "1",
+                "-dfs_all", "0",
+                "-outdir", "${workspaceFolder}/results/fbs"
             ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
@@ -60,12 +62,12 @@
             "request": "launch",
             "program": "${workspaceFolder}/solvers/sbbu/sbbu.exe",
             "args": [
-                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1wj5_model1_chainA_segment5.csv",
+                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1y7n_model1_chainA_segment7.csv",
                 "-tmax", "3600",
                 "-dtol", "1e-5",
-                "-fbs", "0",
-                "-dfs_all", "1",
-                "-outdir", "${workspaceFolder}/dmdgp_HA9H_sbbu"
+                "-fbs", "1",
+                "-dfs_all", "0",
+                "-outdir", "${workspaceFolder}/results/fbs"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

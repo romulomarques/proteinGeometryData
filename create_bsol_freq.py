@@ -163,6 +163,11 @@ if __name__ == "__main__":
         .reset_index()
     )
 
+    # resetting the order of the columns
+    df_train = df_train[
+        ["code", "len_bsol", "bsol", "type", "count", "total", "relfreq"]
+    ]
+
     df_train.sort_values(["code", "relfreq"], ascending=[True, False], inplace=True)
 
     save_train_test(df_train, test_files)

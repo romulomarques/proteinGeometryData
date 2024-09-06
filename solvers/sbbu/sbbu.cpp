@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     sbbu_t sbbu(dgp, dtol, imax, dfs_all, fbs_active);
     sbbu.solve(tmax, fbs_active, verbose);
     
-    // defining directory to save the results    
+    // defining directory to save the results 
     sbbu.save_coords( fname, outdir, verbose );
     sbbu.save_edge_measurements( fname, outdir, verbose );
     

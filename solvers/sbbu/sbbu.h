@@ -166,8 +166,8 @@ public:
       // init fbs
       if( fbs_active )
       {
-         // read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
-         read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
+         read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
+         // read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
       }
 
       // init m_x;
@@ -462,11 +462,11 @@ public:
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
-      fprintf( fid, "i,j,edge_time,edge_niters,is_independent\n" );
+      fprintf( fid, "i,j,edge_time,edge_niters,is_independent,code\n" );
       for ( auto k = 0; k < m_nedges; ++k )
       {
          const int is_independent = m_edges[ k ].m_code >= 0 ? 1 : 0;
-         fprintf( fid, "%d,%d,%.18g,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], is_independent );
+         fprintf( fid, "%d,%d,%.18g,%d,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], is_independent, m_edges[ k ].m_code );
       }
 
       fclose( fid );

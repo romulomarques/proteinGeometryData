@@ -26,8 +26,8 @@ def run_sbbu(sbbu_dir, dmdgp_dir, out_dir, instance_file):
 
 def main():
     # Specify the path to the root directory
-    # root_dir = "/home/romulosmarques/Projects/proteinGeometryData"
-    root_dir = "/home/michael/gitrepos/rs_ROMULO"
+    root_dir = "/home/romulosmarques/Projects/proteinGeometryData"
+    # root_dir = "/home/michael/gitrepos/rs_ROMULO"
 
     # Specify the path to the dmdgp_HA9H directory
     dmdgp_dir = os.path.join(root_dir, "dmdgp_HA9H")
