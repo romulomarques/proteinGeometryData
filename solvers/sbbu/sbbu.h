@@ -472,6 +472,22 @@ public:
       fclose( fid );
    }
 
+   inline bool check_traverse_feasibility(const double* xi, const double* xj, const double dij, double &eij_min, const int kmax, const bool* f)
+   {
+      double eij = fabs( vec3_dist( xi, xj ) - dij );
+      if ( eij < eij_min )
+      {
+         eij_min = eij;
+         // update the best solution
+         for ( int i = 0; i <= kmax; ++i )
+            m_fopt[ i ] = f[ i ];
+         
+         return true;
+      }
+
+      return false;
+   }
+
    double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
    {
       const int kmax = m_n - 1;
@@ -479,7 +495,7 @@ public:
       double* xj = &m_x[ 3 * edge.m_j ];
 
       double eij = 0.0;
-      int niters = 0;
+      int niters = 1;
 
       double eij_min = m_dtol;
 
@@ -509,8 +525,114 @@ public:
          else
          {
             ++k;
+            continue;
          }
          cr.reflect( m_f, m_n, xj ); // updates x
+         ++niters;
+      }
+
+      vec3_copy( xj, cr.m_y );
+
+      m_niters[ edge_id ] = niters;
+
+      return eij_min;
+   }
+   
+   // double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
+   // {
+   //    const int kmax = m_n - 1;
+   //    double* xi = &m_x[ 3 * edge.m_i ];
+   //    double* xj = &m_x[ 3 * edge.m_j ];
+
+   //    double eij_min = m_dtol, dij = edge.m_l;
+
+   //    bool is_feasible = check_traverse_feasibility( xi, xj, dij, eij_min, kmax, m_f );
+   //    int niters = 1;
+
+   //    for ( int k = kmax, count = 0; ( count < m_imax ) && ( !is_feasible || m_dfs_all ); ++count )
+   //    {
+   //       if ( k == kmax ) // backtrack
+   //       {
+   //          for ( ; k >= 0 && m_f[ k ]; --k )
+   //             m_f[ k ] = false;
+   //          if ( k < 0 )
+   //             break;
+   //          m_f[ k ] = true;
+   //       }
+   //       else
+   //       {
+   //          ++k;
+   //          continue;
+   //       }
+
+   //       cr.reflect( m_f, m_n, xj ); // updates x
+
+   //       is_feasible = check_traverse_feasibility( xi, xj, dij, eij_min, kmax, m_f );
+   //       ++niters;
+   //    }
+
+   //    vec3_copy( xj, cr.m_y );
+
+   //    m_niters[ edge_id ] = niters;
+
+   //    return eij_min;
+   // }
+
+   // double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
+   // {
+   //    const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
+   //    const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
+   //    double* xi = &m_x[ 3 * edge.m_i ];
+   //    double* xj = &m_x[ 3 * edge.m_j ];
+
+   //    double eij_min = m_dtol, dij = edge.m_l;
+      
+   //    bool is_feasible = check_traverse_feasibility(xi, xj, dij, eij_min, bsol_size, f);
+   //    int niters = 1, k = 0;
+
+   //    for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax && !is_feasible; k += bsol_size )
+   //    {
+   //       const bool* f = &m_fbs_code[ k ];
+   //       cr.reflect( f, m_n, xj ); // updates x
+   //       is_feasible = check_traverse_feasibility(xi, xj, dij, eij_min, bsol_size, f);
+   //       ++niters;
+   //    }
+
+   //    vec3_copy( xj, cr.m_y );
+
+   //    m_niters[ edge_id ] = niters;
+
+   //    return eij_min;
+   // }
+
+   double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
+   {
+      const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
+      const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
+      double* xi = &m_x[ 3 * edge.m_i ];
+      double* xj = &m_x[ 3 * edge.m_j ];
+
+      double eij = 0.0;
+      double eij_min = m_dtol;
+      int niters = 0;
+
+      int k;
+      for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax; k += bsol_size )
+      {
+         const bool* f = &m_fbs_code[ k ];
+         cr.reflect( f, m_n, xj ); // updates x
+         
+         eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
+
+         // solution found
+         if ( eij < eij_min )
+         {
+            eij_min = eij;
+            // update the best solution
+            for ( int i = 0; i < bsol_size; ++i )
+               m_fopt[ i ] = f[ i ];
+            break;
+         }
          ++niters;
       }
 
@@ -552,42 +674,6 @@ public:
       }
    }
 
-   double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
-   {
-      const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
-      const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
-      double* xi = &m_x[ 3 * edge.m_i ];
-      double* xj = &m_x[ 3 * edge.m_j ];
-
-      double eij = 0.0;
-      double eij_min = m_dtol;
-      int niters = 0;
-
-      int k;
-      for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax; k += bsol_size )
-      {
-         const bool* f = &m_fbs_code[ k ];
-         cr.reflect( f, m_n, xj ); // updates x
-         ++niters;
-         eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
-
-         // solution found
-         if ( eij < eij_min )
-         {
-            eij_min = eij;
-            // update the best solution
-            for ( int i = 0; i < bsol_size; ++i )
-               m_fopt[ i ] = f[ i ];
-            break;
-         }
-      }
-
-      vec3_copy( xj, cr.m_y );
-
-      m_niters[ edge_id ] = niters;
-
-      return eij_min;
-   }
 
    void solve_edge( const edge_t& edge, bool fbs_active, int edge_id )
    {
