@@ -166,8 +166,8 @@ public:
       // init fbs
       if( fbs_active )
       {
-         read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
-         // read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
+         // read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
+         read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
       }
 
       // init m_x;
@@ -521,12 +521,9 @@ public:
             if ( k < 0 )
                break;
             m_f[ k ] = true;
+            k = kmax;
          }
-         else
-         {
-            ++k;
-            continue;
-         }
+
          cr.reflect( m_f, m_n, xj ); // updates x
          ++niters;
       }
@@ -538,73 +535,6 @@ public:
       return eij_min;
    }
    
-   // double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
-   // {
-   //    const int kmax = m_n - 1;
-   //    double* xi = &m_x[ 3 * edge.m_i ];
-   //    double* xj = &m_x[ 3 * edge.m_j ];
-
-   //    double eij_min = m_dtol, dij = edge.m_l;
-
-   //    bool is_feasible = check_traverse_feasibility( xi, xj, dij, eij_min, kmax, m_f );
-   //    int niters = 1;
-
-   //    for ( int k = kmax, count = 0; ( count < m_imax ) && ( !is_feasible || m_dfs_all ); ++count )
-   //    {
-   //       if ( k == kmax ) // backtrack
-   //       {
-   //          for ( ; k >= 0 && m_f[ k ]; --k )
-   //             m_f[ k ] = false;
-   //          if ( k < 0 )
-   //             break;
-   //          m_f[ k ] = true;
-   //       }
-   //       else
-   //       {
-   //          ++k;
-   //          continue;
-   //       }
-
-   //       cr.reflect( m_f, m_n, xj ); // updates x
-
-   //       is_feasible = check_traverse_feasibility( xi, xj, dij, eij_min, kmax, m_f );
-   //       ++niters;
-   //    }
-
-   //    vec3_copy( xj, cr.m_y );
-
-   //    m_niters[ edge_id ] = niters;
-
-   //    return eij_min;
-   // }
-
-   // double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
-   // {
-   //    const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
-   //    const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
-   //    double* xi = &m_x[ 3 * edge.m_i ];
-   //    double* xj = &m_x[ 3 * edge.m_j ];
-
-   //    double eij_min = m_dtol, dij = edge.m_l;
-      
-   //    bool is_feasible = check_traverse_feasibility(xi, xj, dij, eij_min, bsol_size, f);
-   //    int niters = 1, k = 0;
-
-   //    for ( k = m_fbs_ivec[ 2 * edge.m_code ]; k < kmax && !is_feasible; k += bsol_size )
-   //    {
-   //       const bool* f = &m_fbs_code[ k ];
-   //       cr.reflect( f, m_n, xj ); // updates x
-   //       is_feasible = check_traverse_feasibility(xi, xj, dij, eij_min, bsol_size, f);
-   //       ++niters;
-   //    }
-
-   //    vec3_copy( xj, cr.m_y );
-
-   //    m_niters[ edge_id ] = niters;
-
-   //    return eij_min;
-   // }
-
    double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
    {
       const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];

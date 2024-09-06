@@ -14,25 +14,25 @@ def run_sbbu(sbbu_exe: str, instance_file: str, outdir: str, fbs: int):
 
 
 def main():
-    # fn_tests = "/home/michael/gitrepos/rs_ROMULO/test_files.txt"
-    fn_tests = "/home/romulosmarques/Projects/proteinGeometryData/test_files.txt"
+    fn_tests = "/home/michael/gitrepos/rs_ROMULO/test_files.txt"
+    # fn_tests = "/home/romulosmarques/Projects/proteinGeometryData/test_files.txt"
     with open(fn_tests, "r") as fid:
         test_files = [s.strip() for s in fid.readlines()]
 
-    # wd_HA9H = "/home/michael/gitrepos/rs_ROMULO/dmdgp_HA9H"
-    # sbbu_exe = "/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/sbbu.exe"
-    # outdir_fbs = "/home/michael/gitrepos/rs_ROMULO/results/fbs"
-    # outdir_dfs = "/home/michael/gitrepos/rs_ROMULO/results/dfs"
+    wd_HA9H = "/home/michael/gitrepos/rs_ROMULO/dmdgp_HA9H"
+    sbbu_exe = "/home/michael/gitrepos/rs_ROMULO/solvers/sbbu/sbbu.exe"
+    outdir_fbs = "/home/michael/gitrepos/rs_ROMULO/results/fbs"
+    outdir_dfs = "/home/michael/gitrepos/rs_ROMULO/results/dfs"
     
-    wd_HA9H = "/home/romulosmarques/Projects/proteinGeometryData/dmdgp_HA9H"
-    sbbu_exe = "/home/romulosmarques/Projects/proteinGeometryData/solvers/sbbu/sbbu.exe"
-    outdir_fbs = "/home/romulosmarques/Projects/proteinGeometryData/results/fbs"
-    outdir_dfs = "/home/romulosmarques/Projects/proteinGeometryData/results/dfs"
+    # wd_HA9H = "/home/romulosmarques/Projects/proteinGeometryData/dmdgp_HA9H"
+    # sbbu_exe = "/home/romulosmarques/Projects/proteinGeometryData/solvers/sbbu/sbbu.exe"
+    # outdir_fbs = "/home/romulosmarques/Projects/proteinGeometryData/results/fbs"
+    # outdir_dfs = "/home/romulosmarques/Projects/proteinGeometryData/results/dfs"
 
     if not os.path.isfile(sbbu_exe):
         raise FileNotFoundError(f"The {sbbu_exe} does not exist.")
 
-    for fn in test_files:
+    for fn in tqdm(test_files):
         fn = os.path.join(wd_HA9H, fn)
 
         if not fn.endswith(".csv"):
