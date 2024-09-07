@@ -5,18 +5,8 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
 
-dmdgp_HA9H_sbbu = "dmdgp_HA9H_sbbu"
-dmdgp_HA9H = "dmdgp_HA9H"
-
-
-def read_dmdgp(fname: str) -> pd.DataFrame:
-    df_dmdgp = pd.read_csv(fname)
-    return df_dmdgp
-
-
-def read_sol(fname: str) -> np.ndarray:
-    x = np.loadtxt(fname)
-    return x
+wd_dmdgp_HA9H_bsol = "dmdgp_HA9H_bsol"
+wd_dmdgp_HA9H = "dmdgp_HA9H"
 
 
 def get_semispace_sign(point: np.ndarray, plane_points: np.ndarray) -> float:
@@ -54,34 +44,45 @@ def get_bit(x: np.ndarray, i: int) -> int:
 
 
 def get_prune_bsol(bsol: list, row: pd.Series) -> tuple:
-    i = row["i"]
-    j = row["j"]
+    i = int(row["i"])
+    j = int(row["j"])
     str_b = "".join([str(bit) for bit in bsol[i + 3 : j + 1]])
     return str_b
 
 
-def process_file(fn_csv):
-    fn_dmdgp = os.path.join(dmdgp_HA9H, fn_csv)
+def process_csv_sol(fn_sol):
 
-    fn_sol = os.path.join(dmdgp_HA9H_sbbu, fn_csv)
-    fn_sol = fn_sol.replace(".csv", ".sol")
-    x = read_sol(fn_sol)
-    b = list(map(lambda i: get_bit(x, i), np.arange(len(x))))
+    x = np.loadtxt(fn_sol)
 
-    df_dmdgp = read_dmdgp(fn_dmdgp)
-    df_dmdgp["bsol"] = df_dmdgp.apply(lambda row: get_prune_bsol(b, row), axis=1)
+    fn_timers = fn_sol.replace("_dfs.sol", "_dfs.tmr")
+    df_timers = pd.read_csv(fn_timers)
+    df_timers = df_timers[df_timers["code"] >= 0]
 
-    fn_out = os.path.join(dmdgp_HA9H_sbbu, fn_csv)
-    df_dmdgp.to_csv(fn_out, index=False)
+    bsol = list(map(lambda i: get_bit(x, i), np.arange(len(x))))
+    df_timers["bsol"] = df_timers.apply(lambda row: get_prune_bsol(bsol, row), axis=1)
+
+    fn_out = fn_timers.replace(wd_dmdgp_HA9H, wd_dmdgp_HA9H_bsol).replace(
+        "_dfs.tmr", "_dfs.csv"
+    )
+    df_timers.to_csv(fn_out, index=False)
+
+
+def process_csv_sol_test(fn_sol):
+    process_csv_sol(fn_sol)
+    exit()
 
 
 if __name__ == "__main__":
-    files = os.listdir(dmdgp_HA9H)
-
     # Set the desired number of worker processes
     num_workers = os.cpu_count() - 1
+
+    # select only csv files in wd_dmdgp_HA9H
+    fn_sols = [fn for fn in os.listdir(wd_dmdgp_HA9H) if fn.endswith("_dfs.sol")]
+    fn_sols = [os.path.join(wd_dmdgp_HA9H, fn) for fn in fn_sols]
+
+    # process_csv_sol_test(fn_sols[0]) # call the function with a single file to test
 
     # Use ProcessPoolExecutor with the specified number of worker processes
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         # Use tqdm to show progress while processing files in parallel
-        list(tqdm(executor.map(process_file, files), total=len(files)))
+        list(tqdm(executor.map(process_csv_sol, fn_sols), total=len(fn_sols)))

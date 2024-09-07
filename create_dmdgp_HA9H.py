@@ -5,9 +5,12 @@ import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
-dmdgp_HA9H = "dmdgp_HA9H"
-if not os.path.exists(dmdgp_HA9H):
-    os.makedirs(dmdgp_HA9H)
+wd_dmdgp = "dmdgp"
+wd_dmdgp_HA9H = "dmdgp_HA9H"
+
+
+if not os.path.exists(wd_dmdgp_HA9H):
+    os.makedirs(wd_dmdgp_HA9H)
 
 
 class edge_t:
@@ -92,7 +95,7 @@ def split_prune_and_discrete_edges(dmdgp: pd.DataFrame) -> list:
     return prune_edges, discrete_edges
 
 
-def set_edges_code(edge_type: str) -> int:
+def get_edge_code(edge_type: str) -> int:
     if edge_type == "HA9H":
         return 0
     elif edge_type == "HA6HA":
@@ -102,49 +105,47 @@ def set_edges_code(edge_type: str) -> int:
     return -1
 
 
-def save_dmdg_order(fn_pkl: str, discrete_edges: list, prune_edges: list) -> list:
-    df = pd.DataFrame(discrete_edges + prune_edges).reset_index(drop=True)
-    df["order"] = df.index
-
-    df["code"] = df["type"].apply(set_edges_code)
-
+def save_dmdgp_HA9H(fn_pkl: str, dmdgp_HA9H: pd.DataFrame) -> None:
     cols = ["i", "j", "i_name", "j_name", "dij", "order", "code"]
-    df = df[cols]
+
+    df = dmdgp_HA9H[cols]
 
     # export to CSV
-    fn_csv = fn_pkl.replace(".pkl", ".csv")
-    df[cols].to_csv(fn_csv, index=False)
+    fn_csv = fn_pkl.replace(wd_dmdgp, wd_dmdgp_HA9H).replace(".pkl", ".csv")
+    df.to_csv(fn_csv, index=False)
 
 
-def process_instance(fn_pkl):
+def process_dmdgp(fn_pkl):
     dmdgp = read_dmdgp(fn_pkl)
     prune_edges, discrete_edges = split_prune_and_discrete_edges(dmdgp)
     prune_edges = sort_prune_edges(prune_edges, verbose=False)
 
-    # Modify the filename for saving
-    fn_pkl_new = fn_pkl.replace("dmdgp", "dmdgp_HA9H")
-    save_dmdg_order(fn_pkl_new, discrete_edges, prune_edges)
+    dmdgp_HA9H = pd.DataFrame(discrete_edges + prune_edges).reset_index(drop=True)
+    dmdgp_HA9H["order"] = dmdgp_HA9H.index
+    dmdgp_HA9H["code"] = dmdgp_HA9H["type"].apply(get_edge_code)
+
+    save_dmdgp_HA9H(fn_pkl, dmdgp_HA9H)
 
 
-def main():
-    dmdgp_directory = "dmdgp"
-    dmdgph_paths = []
-    for fn in os.listdir(dmdgp_directory):
+def process_dmdgp_test():
+    fn_pkl = "dmdgp/1wj5_model1_chainA_segment5.pkl"
+    process_dmdgp(fn_pkl)
+    exit()
+
+
+if __name__ == "__main__":
+    # process_dmdgp_test()
+    
+    dmdgp_paths = []
+    for fn in os.listdir(wd_dmdgp):
         if fn.endswith(".pkl"):
-            dmdgph_paths.append(os.path.join(dmdgp_directory, fn))
+            dmdgp_paths.append(os.path.join(wd_dmdgp, fn))
 
     # Create a ThreadPoolExecutor
     with ProcessPoolExecutor() as executor:
         list(
             tqdm(
-                executor.map(process_instance, dmdgph_paths),
-                total=len(dmdgph_paths),
+                executor.map(process_dmdgp, dmdgp_paths),
+                total=len(dmdgp_paths),
             )
         )
-
-
-if __name__ == "__main__":
-    # fn_pkl = "dmdgp/1wj5_model1_chainA_segment5.pkl"
-    # process_file(fn_pkl)
-
-    main()

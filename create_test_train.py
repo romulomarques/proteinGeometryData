@@ -5,17 +5,17 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import pickle
 from sklearn.model_selection import train_test_split
-from create_dmdgp_HA9H_order import set_edges_code
+from create_dmdgp_HA9H import get_edge_code
 from typing import Tuple, List
 
-wd_dmdgp_HA9A_sbbu = "dmdgp_HA9H_sbbu"
+wd_dmdgp_HA9A_bsol = "dmdgp_HA9H_bsol"
 
 
 def bsol_split_train_test(random_state):
 
     # get all pdb codes
     pdb_codes = set()
-    for fn in os.listdir(wd_dmdgp_HA9A_sbbu):
+    for fn in os.listdir(wd_dmdgp_HA9A_bsol):
         if not fn.endswith(".csv"):
             continue
         pdb_code = fn.split("_")[0]
@@ -31,7 +31,7 @@ def bsol_split_train_test(random_state):
     test_bsol_files = []
 
     # split bsol files into train and test
-    for fn in os.listdir(wd_dmdgp_HA9A_sbbu):
+    for fn in os.listdir(wd_dmdgp_HA9A_bsol):
         if not fn.endswith(".csv"):
             continue
         pdb_code = fn.split("_")[0]
@@ -40,11 +40,14 @@ def bsol_split_train_test(random_state):
         else:
             test_bsol_files.append(fn)
 
+    total_files = len(train_bsol_files) + len(test_bsol_files)
+    print(
+        f"Number of training files: {len(train_bsol_files)} ({len(train_bsol_files)/total_files:.2f})"
+    )
+    print(
+        f"Number of test files: {len(test_bsol_files)} ({len(test_bsol_files)/total_files:.2f})"
+    )
     return train_bsol_files, test_bsol_files
-
-
-def get_edge_type(row: pd.Series) -> str:
-    return f"{row['i_name']}{int(row['j']) - int(row['i'])}{row['j_name']}"
 
 
 def get_repetition_indexes(fn_dmdgp):
@@ -52,45 +55,40 @@ def get_repetition_indexes(fn_dmdgp):
     return df[df["dij"] == 0.0]["j"].to_list()
 
 
-def flip_bsol(bsol: str) -> str:
-    # flip all the bits if the first bit is 1
+def normalize_bsol(bsol: str) -> str:
     if bsol[0] == "1":
-        bsol = "".join(["1" if bit == "0" else "0" for bit in bsol])
+        bsol[0] = "0"
     return bsol
 
 
 def count_bsol(fname: str) -> pd.DataFrame:
-    df_dmdgp_HA9H_bsol = pd.read_csv(fname, dtype={"bsol": str})
-    # keep only the pruning edges
-    df_dmdgp_HA9H_bsol = df_dmdgp_HA9H_bsol[
-        df_dmdgp_HA9H_bsol["j"] - df_dmdgp_HA9H_bsol["i"] > 3
-    ]
-    # set the edge type
-    df_dmdgp_HA9H_bsol["type"] = df_dmdgp_HA9H_bsol.apply(get_edge_type, axis=1)
+    df_bsol = pd.read_csv(fname, dtype={"bsol": str})
 
-    df_freq = (
-        df_dmdgp_HA9H_bsol.groupby(["type", "bsol"]).size().reset_index(name="count")
-    )
+    df_freq = df_bsol.groupby(["code", "bsol"]).size().reset_index(name="count")
 
     return df_freq
 
 
-def collect_all_bsol_data(fnames: list) -> pd.DataFrame:
+def concatenate_bsol_data(fnames: list) -> pd.DataFrame:
 
     print("Collecting all SBBU binary data...")
     print("Storing a dataframe for each instance data...")
+
+    count_bsol(fnames[0])
+
     with ProcessPoolExecutor() as executor:
         data = list(tqdm(executor.map(count_bsol, fnames), total=len(fnames)))
 
     print("Concatenating all the dataframes into a single dataframe...")
     df_dmdgp_HA9H_bsol = pd.concat(data, ignore_index=True)
     df_dmdgp_HA9H_bsol = (
-        df_dmdgp_HA9H_bsol[["type", "bsol", "count"]]
-        .groupby(["type", "bsol"])["count"]
+        df_dmdgp_HA9H_bsol[["code", "bsol", "count"]]
+        .groupby(["code", "bsol"])["count"]
         .sum()
         .reset_index()
     )
-    df_dmdgp_HA9H_bsol["total"] = df_dmdgp_HA9H_bsol.groupby("type")["count"].transform(
+
+    df_dmdgp_HA9H_bsol["total"] = df_dmdgp_HA9H_bsol.groupby("code")["count"].transform(
         "sum"
     )
 
@@ -99,7 +97,6 @@ def collect_all_bsol_data(fnames: list) -> pd.DataFrame:
         df_dmdgp_HA9H_bsol["count"] / df_dmdgp_HA9H_bsol["total"]
     )
     df_dmdgp_HA9H_bsol["len_bsol"] = df_dmdgp_HA9H_bsol["bsol"].apply(len)
-    df_dmdgp_HA9H_bsol["code"] = df_dmdgp_HA9H_bsol["type"].apply(set_edges_code)
 
     df_dmdgp_HA9H_bsol.sort_values(
         ["code", "len_bsol", "relfreq"], ascending=[True, True, False], inplace=True
@@ -130,31 +127,24 @@ def save_train_test(df_train: pd.DataFrame, test_files: list):
 if __name__ == "__main__":
     random_state = 42
     train_files, test_files = bsol_split_train_test(random_state)
-    # csv_files = [os.path.join(wd_dmdgp_HA9A_sbbu, fn) for fn in os.listdir('dmdgp_HA9H_sbbu') if fn.endswith('.csv')]
+
     train_files = [
-        os.path.join(wd_dmdgp_HA9A_sbbu, fn)
+        os.path.join(wd_dmdgp_HA9A_bsol, fn)
         for fn in train_files
         if fn.endswith(".csv")
     ]
-    df = collect_all_bsol_data(train_files)
-    df_train = df[
-        (df["type"] == "C4CA") | (df["type"] == "HA9H") | (df["type"] == "HA6HA")
-    ]
 
-    # keep only the relevant columns
-    df_train = df_train[
-        ["code", "len_bsol", "bsol", "type", "count", "total", "relfreq"]
-    ]
+    df_train = concatenate_bsol_data(train_files)
 
     # combining the symmetric bsol values
-    df_train["bsol"] = df_train["bsol"].apply(lambda x: flip_bsol(x))
+    df_train["bsol"] = df_train["bsol"].apply(lambda x: normalize_bsol(x))
+
     df_train = (
         df_train.groupby(["bsol"])
         .agg(
             {
                 "code": "first",
                 "len_bsol": "first",
-                "type": "first",
                 "count": "sum",
                 "total": "first",
                 "relfreq": "sum",
@@ -164,9 +154,7 @@ if __name__ == "__main__":
     )
 
     # resetting the order of the columns
-    df_train = df_train[
-        ["code", "len_bsol", "bsol", "type", "count", "total", "relfreq"]
-    ]
+    df_train = df_train[["code", "len_bsol", "bsol", "count", "total", "relfreq"]]
 
     df_train.sort_values(["code", "relfreq"], ascending=[True, False], inplace=True)
 

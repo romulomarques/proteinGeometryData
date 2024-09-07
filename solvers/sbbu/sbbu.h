@@ -139,7 +139,7 @@ public:
    double* m_timers; // time spent to solve each edge
    int* m_niters; // number of iterations to solve each edge
    bool* m_fbs_code; // fbs code = [j, bsol], where j is the index where to overwrite the previous solution
-   int* m_fbs_ivec;  // start index of fbs solutions
+   int*  m_fbs_ivec;  // start index of fbs solutions
    bool m_fbs_active; // fbs active
    bool m_dfs_all;   // all possible configurations will be checked in dfs_traverse
 
@@ -301,7 +301,7 @@ public:
    // Set m_x[i] given points A, B, C and their distances a2, b2, c2.
    // m_x[i] = P + alpha * N, where N is the normal to the plane A,B,C and P is the proj of m_x[i] on this plane.
    void set_x( int i, const double* A, double a2, const double* B, double b2, const double* C, double c2 )
-   {
+   {      
       const double err_a = fabs( vec3_dist2( A, &m_x[ 3 * i ] ) - a2 );
       const double err_b = fabs( vec3_dist2( B, &m_x[ 3 * i ] ) - b2 );
       const double err_c = fabs( vec3_dist2( C, &m_x[ 3 * i ] ) - c2 );
@@ -347,6 +347,13 @@ public:
       const double* A = &m_x[ 3 * ( i - 3 ) ];
       const double* B = &m_x[ 3 * ( i - 2 ) ];
       const double* C = &m_x[ 3 * ( i - 1 ) ];
+      
+      // x[i] does not need to be moved (it's a copy of x[i-3])
+      if( m_dgp.m_a2[ i ] < m_dtol ){
+         vec3_copy( &m_x[ 3 * i ], A );
+         return;
+      }
+
       set_x( i, A, m_dgp.m_a2[ i ], B, m_dgp.m_b2[ i ], C, m_dgp.m_c2[ i ] );
    }
 
@@ -416,22 +423,18 @@ public:
       m_root[ i ] = r;
    }
 
-   void save_coords( std::string fname, std::string outdir, bool verbose = false )
-   {      
-      size_t i_last_delimitator = fname.find_last_of( '/' );
-      std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
-      std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
+   void save_coords( std::string fname, bool fbs_active, bool verbose = false )
+   {
+      std::string fn_ext = fname.substr( fname.find_last_of( '.' ) ); // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, outdir.c_str() );
-      strcat( fsol, "/" );
-      strcat( fsol, just_fname.c_str() );            
-      char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
-      sprintf( p, ".sol" );                     // replace suffix
+      strcpy( fsol, fname.c_str() );
+      char* p = strstr( fsol, fn_ext.c_str() );           // returns a pointer to the first occurrence of the filename extension
+      sprintf( p, fbs_active ? "_fbs.sol" : "_dfs.sol" ); // replace suffix
 
       if ( verbose )
       {
-         printf( "Saving coords to %s\n.", fsol );
+         printf( "Saving coords to %s", fsol );
       }
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
@@ -442,22 +445,18 @@ public:
       fclose( fid );
    }
 
-   void save_edge_measurements( std::string fname, std::string outdir, bool verbose = false )
+   void save_edge_measurements( std::string fname, bool fbs_active, bool verbose = false )
    {
-      size_t i_last_delimitator = fname.find_last_of( '/' );
-      std::string just_fname = fname.substr( i_last_delimitator + 1 ); // Extract the file name from the file path
       std::string fn_ext = fname.substr( fname.find_last_of( '.' ) );  // gets the file extension
 
       char fsol[ FILENAME_MAX ];
-      strcpy( fsol, outdir.c_str() );
-      strcat( fsol, "/" );
-      strcat( fsol, just_fname.c_str() );
+      strcpy( fsol, fname.c_str() );
       char* p = strstr( fsol, fn_ext.c_str() ); // returns a pointer to the first occurrence of the filename extension
-      sprintf( p, ".csv" );         // replace suffix
+      sprintf( p, fbs_active ? "_fbs.tmr" : "_dfs.tmr" ); // replace suffix
 
       if ( verbose )
       {
-         printf( "Saving measuremnts to %s\n.", fsol );
+         printf( "Saving timers to %s", fsol );
       }
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
@@ -465,8 +464,7 @@ public:
       fprintf( fid, "i,j,edge_time,edge_niters,is_independent,code\n" );
       for ( auto k = 0; k < m_nedges; ++k )
       {
-         const int is_independent = m_edges[ k ].m_code >= 0 ? 1 : 0;
-         fprintf( fid, "%d,%d,%.18g,%d,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], is_independent, m_edges[ k ].m_code );
+         fprintf( fid, "%d,%d,%.18g,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], m_edges[ k ].m_code );
       }
 
       fclose( fid );
@@ -488,29 +486,69 @@ public:
       return false;
    }
 
-   double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
+   bool check_solutions( cluster_t& cr, const double *xi, double *xj, double dij, bool *m_fopt, int edge_id, bool verbose = false )
+   {
+      cr.reflect( m_fopt, m_n, xj ); // updates x
+      
+      double eij_opt = fabs( vec3_dist( xi, xj ) - dij );
+      bool is_ok_opt = eij_opt < m_dtol;
+
+      // flip all bits
+      for ( int k = 0; k < m_n; ++k )
+      {
+         m_f[ k ] = m_fopt[ k ];
+      }
+      m_f[ 0 ] = !m_fopt[ 0 ];
+
+      cr.reflect( m_f, m_n, xj ); // updates x
+      
+      double eij_flp = fabs( vec3_dist( xi, xj ) - dij );
+      bool is_ok_flp = eij_flp < m_dtol;
+
+      bool is_ok = is_ok_opt && is_ok_flp;
+      if( verbose )
+      {
+         printf( "Edge (%d, %d, %f) - eij_opt = %g, eij_flp = %g, is_ok = %d\n", m_edges[ edge_id ].m_i, m_edges[ edge_id ].m_j, dij, eij_opt, eij_flp, is_ok );
+      }
+
+      return is_ok;
+   }
+
+   double dfs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id, bool verbose = false )
    {
       const int kmax = m_n - 1;
       double* xi = &m_x[ 3 * edge.m_i ];
       double* xj = &m_x[ 3 * edge.m_j ];
 
       double eij = 0.0;
-      int niters = 1;
+      int niters = 1, num_sols = 0;
 
-      double eij_min = m_dtol;
+      double eij_min = m_dtol, dij = edge.m_l;
 
       for ( int k = kmax, count = 0; count < m_imax; ++count )
       {
-         eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
+         eij = fabs( vec3_dist( xi, xj ) - dij );
 
          // solution found
-         if ( eij < eij_min )
+         if ( eij < m_dtol )
          {
-            eij_min = eij;
-            // update the best solution
-            for ( int i = 0; i <= kmax; ++i )
-               m_fopt[ i ] = m_f[ i ];
-            if ( ! m_dfs_all )
+            ++num_sols;            
+
+            // display the current solution
+            // printf( "m_f = " );
+            // for ( int i = 0; i <= kmax; ++i )
+            //    printf( "%d ", m_f[ i ] );
+            // printf( "\n" );
+            
+            if( eij_min > eij )
+            {
+               eij_min = eij;
+               // update the best solution
+               for ( int i = 0; i <= kmax; ++i )
+                  m_fopt[ i ] = m_f[ i ];
+            }
+
+            if ( !m_dfs_all )
                break;
          }
 
@@ -524,8 +562,20 @@ public:
             k = kmax;
          }
 
+         // display the current solution
+         // printf( "m_f = " );
+         // for ( int i = 0; i <= kmax; ++i )
+         //    printf( "%d ", m_f[ i ] );
+         // printf( "\n" );
+
          cr.reflect( m_f, m_n, xj ); // updates x
          ++niters;
+      }
+
+      if( verbose && edge.m_code >= 0 )
+      {
+         printf( "Edge (%d, %d, %f) - eij_min = %g, num_sols = %d, niters = %d\n", edge.m_i, edge.m_j, dij, eij_min, num_sols, niters );
+         check_solutions( cr, xi, xj, dij, m_fopt, edge_id, verbose );
       }
 
       vec3_copy( xj, cr.m_y );
@@ -534,8 +584,8 @@ public:
 
       return eij_min;
    }
-   
-   double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id )
+
+   double fbs_traverse( const edge_t& edge, cluster_t& cr, const int edge_id, bool verbose = false )
    {
       const int kmax = m_fbs_ivec[ 2 * ( edge.m_code + 1 ) ];
       const int bsol_size = m_fbs_ivec[ 2 * edge.m_code + 1 ];
@@ -569,6 +619,11 @@ public:
       vec3_copy( xj, cr.m_y );
 
       m_niters[ edge_id ] = niters;
+
+      if( verbose )
+      {
+         printf( "Edge (%d, %d, %f) - eij_min = %g, niters = %d\n", edge.m_i, edge.m_j, edge.m_l, eij_min, niters );
+      }
 
       return eij_min;
    }
@@ -605,7 +660,7 @@ public:
    }
 
 
-   void solve_edge( const edge_t& edge, bool fbs_active, int edge_id )
+   void solve_edge( const edge_t& edge, bool fbs_active, int edge_id, bool verbose = false )
    {
       // init x[k,:], for k in edge.i, edge.i+1, ..., m_j[m_j[edge.i]]
       int r = find_root( edge.m_i + 3 );
@@ -665,9 +720,9 @@ public:
       // counting the time to solve the k-th edge
       double tic_edge = omp_get_wtime();
       if ( fbs_active && edge.m_code >= 0 )
-         eij = fbs_traverse( edge, cr, edge_id );
+         eij = fbs_traverse( edge, cr, edge_id, verbose );
       else
-         eij = dfs_traverse( edge, cr, edge_id );
+         eij = dfs_traverse( edge, cr, edge_id, verbose );
       m_timers[ edge_id ] = omp_get_wtime() - tic_edge;
 
       if ( eij > m_dtol ) // edges of range 4 allways have two solutions
@@ -739,7 +794,7 @@ public:
             }
          }
 
-         solve_edge( edge, fbs_active, k );
+         solve_edge( edge, fbs_active, k, verbose );
          if ( omp_get_wtime() - tic > tmax )
             throw std::runtime_error( "SBBU: time exceeded (tmax = " + std::to_string( tmax ) + ")." );
 

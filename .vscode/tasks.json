@@ -61,7 +61,7 @@
             "detail": "Build the solver sbbu.exe with debug flags"
         },
         {
-            "label": "black it!",
+            "label": "Black it!",
             "type": "shell",
             "command": "black",
             "args": [

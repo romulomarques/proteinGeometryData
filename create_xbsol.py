@@ -4,6 +4,8 @@ import pandas as pd
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
+wd_segment = "segment"
+
 
 # add, for each residue, a repetition of the CA atom at the end of the residue
 def extract_atoms_with_reorder(df: pd.DataFrame) -> list:
@@ -74,7 +76,7 @@ def check_segment(df: pd.DataFrame) -> bool:
     return all(df_grouped_by_residue[1:].apply(is_valid_residue, axis=1))
 
 
-def read_instance(file_path):
+def read_segment(file_path):
     # read csv file
     df = pd.read_csv(file_path)
 
@@ -108,61 +110,6 @@ def read_instance(file_path):
     # check if the segment is valid
     if not check_segment(df):
         raise ValueError(f"Invalid segment: {file_path}")
-
-    return df
-
-
-def extract_prune_edges(atoms, dij_max=5):
-    edges = []
-    for i in range(len(atoms)):
-        ai_residue_number, ai_name, ai_x = atoms[i][0], atoms[i][3], atoms[i][5]
-        # add the only CA pruning edge
-        if ai_name == "CA" and i > 3:
-            j = i - 4
-            aj_residue_number, aj_name, aj_x = atoms[j][0], atoms[j][3], atoms[j][5]
-            dij = np.linalg.norm(ai_x - aj_x)
-            # j < i
-            edges.append(
-                (j, i, aj_name, ai_name, aj_residue_number, ai_residue_number, dij)
-            )
-            continue
-
-        # keep only hydrogens
-        if ai_name not in ["H", "HA"]:
-            continue
-
-        # skip the discretization edges
-        for j in range(i + 4, len(atoms)):
-            aj_residue_number, aj_name, aj_x = atoms[j][0], atoms[j][3], atoms[j][5]
-            if aj_name not in ["H", "HA"]:
-                continue
-            dij = np.linalg.norm(ai_x - aj_x)
-            if dij < dij_max:
-                edges.append(
-                    (i, j, ai_name, aj_name, ai_residue_number, aj_residue_number, dij)
-                )
-    edges = sorted(edges)
-
-    columns = [
-        "i",
-        "j",
-        "i_name",
-        "j_name",
-        "i_residue_number",
-        "j_residue_number",
-        "dij",
-    ]
-    df_prune = pd.DataFrame(edges, columns=columns)
-    return df_prune
-
-
-def read_xsol(fn_xsol):
-    df = pd.read_csv(fn_xsol)
-    df["x"] = df["x"].apply(
-        lambda x: np.array(list(filter(None, x[1 : len(x) - 1].split(" ")))).astype(
-            np.double
-        )
-    )
 
     return df
 
@@ -202,17 +149,10 @@ def get_bit(df_xbsol: pd.DataFrame, row: pd.Series) -> int:
         return int(semispace_sign > 0)
 
 
-def get_prune_bsol(bsol: np.array, row: pd.Series) -> tuple:
-    i = int(row["i"])
-    j = int(row["j"])
-    str_b = "".join([str(bit) for bit in bsol[i + 3 : j + 1]])
-    return str_b
-
-
-def process_instance(fn_segment: str, verbose: bool = False) -> None:
+def process_segment(fn_segment: str, verbose: bool = False) -> None:
     # Read and process the instance
     try:
-        df = read_instance(fn_segment)
+        df = read_segment(fn_segment)
     except ValueError as e:
         if verbose:
             print(f"Error processing {fn_segment}: {e}")
@@ -227,51 +167,33 @@ def process_instance(fn_segment: str, verbose: bool = False) -> None:
     fn_xbsol = os.path.join("xbsol", os.path.basename(fn_segment))
     df_xbsol.to_csv(fn_xbsol, index=False)
 
-    # create prune edges file as a csv
-    df_prune = extract_prune_edges(atoms)
-    bsol = df_xbsol["b"].values
-    df_prune["bsol"] = df_prune.apply(lambda row: get_prune_bsol(bsol, row), axis=1)
 
-    fn_dmdgp = os.path.join("prune_bsol", os.path.basename(fn_segment))
-    df_prune.to_csv(fn_dmdgp, index=False)
-
-
-def test_process_instance():
-    os.makedirs("segment", exist_ok=True)
-    os.makedirs("xbsol", exist_ok=True)
-    os.makedirs("prune_bsol", exist_ok=True)
-
+def test_process_segment():
     fn_segment = "segment/1a1u_model1_chainA_segment0.csv"
-    # fn_segment = 'segment/1ah1_model1_chainA_segment0.csv'
-    process_instance(fn_segment)
+    process_segment(fn_segment)
+    exit()
 
 
-def main():
+if __name__ == "__main__":
+    # test_process_segment()
+
     # Ensure the dmdgp folder is created
-    print("Creating prune_bsol directory...")
-    os.makedirs("prune_bsol", exist_ok=True)
-
     print("Creating xbsol directory...")
     os.makedirs("xbsol", exist_ok=True)
 
     # List all .csv files in the segment directory
-    print("Processing instances...")
+    print("Processing segments...")
     fn_segments = [f for f in os.listdir("segment") if f.endswith(".csv")]
 
     # Process the instances in parallel
-    print("Creating prune_xbsol files...")
+    print("Creating xbsol files...")
     with ProcessPoolExecutor() as executor:
         list(
             tqdm(
                 executor.map(
-                    process_instance,
+                    process_segment,
                     [os.path.join("segment", fn) for fn in fn_segments],
                 ),
                 total=len(fn_segments),
             )
         )
-
-
-if __name__ == "__main__":
-    # test_process_instance()
-    main()

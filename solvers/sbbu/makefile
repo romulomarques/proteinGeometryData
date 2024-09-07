@@ -27,6 +27,10 @@ test_all: sbbu.exe
 debug: sbbu_dbg.exe
 	gdb ./sbbu_dbg.exe
 
+run: sbbu.exe
+	clear
+	./sbbu.exe -nmr "/home/michael/github/rs_ROMULO/dmdgp_HA9H/1a1u_model1_chainA_segment1.csv" -tmax 3600 -dtol 1e-10 -fbs 0 -dfs_all 1 -verbose 1
+
 .PHONY: all test_all debug clean
 
 clean:

@@ -41,3 +41,5 @@ test_files.txt
 results/dfs/**
 results/fbs/**
 results/speed_ups/**
+dmdgp_HA9H_bsol/**
+prune_edges/**
