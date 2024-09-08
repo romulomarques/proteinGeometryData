@@ -166,8 +166,8 @@ public:
       // init fbs
       if( fbs_active )
       {
-         // read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
-         read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
+         read_fbs( "/home/romulosmarques/Projects/proteinGeometryData/df_train.csv" );
+         // read_fbs( "/home/michael/gitrepos/rs_ROMULO/df_train.csv" );
       }
 
       // init m_x;
@@ -461,7 +461,7 @@ public:
       FILE* fid = fopen( fsol, "w" );
       if ( fid == NULL )
          throw std::runtime_error( "The solution file could not be created." );
-      fprintf( fid, "i,j,edge_time,edge_niters,is_independent,code\n" );
+      fprintf( fid, "i,j,edge_time,edge_niters,code\n" );
       for ( auto k = 0; k < m_nedges; ++k )
       {
          fprintf( fid, "%d,%d,%.18g,%d,%d\n", m_edges[ k ].m_i, m_edges[ k ].m_j, m_timers[ k ], m_niters[ k ], m_edges[ k ].m_code );
@@ -493,7 +493,7 @@ public:
       double eij_opt = fabs( vec3_dist( xi, xj ) - dij );
       bool is_ok_opt = eij_opt < m_dtol;
 
-      // flip all bits
+      // getting the symmetric solution, which means flipping just the first position of bsol
       for ( int k = 0; k < m_n; ++k )
       {
          m_f[ k ] = m_fopt[ k ];

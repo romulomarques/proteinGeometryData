@@ -57,8 +57,9 @@ def get_repetition_indexes(fn_dmdgp):
 
 def normalize_bsol(bsol: str) -> str:
     if bsol[0] == "1":
-        bsol[0] = "0"
-    return bsol
+        return "0" + bsol[1:]
+    else:
+        return bsol
 
 
 def count_bsol(fname: str) -> pd.DataFrame:

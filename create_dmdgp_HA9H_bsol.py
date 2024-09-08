@@ -8,6 +8,9 @@ from concurrent.futures import ProcessPoolExecutor
 wd_dmdgp_HA9H_bsol = "dmdgp_HA9H_bsol"
 wd_dmdgp_HA9H = "dmdgp_HA9H"
 
+if not os.path.exists(wd_dmdgp_HA9H_bsol):
+    os.makedirs(wd_dmdgp_HA9H_bsol)
+
 
 def get_semispace_sign(point: np.ndarray, plane_points: np.ndarray) -> float:
     """

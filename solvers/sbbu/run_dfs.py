@@ -5,7 +5,7 @@ from pathlib import Path
 
 wd = Path(__file__).resolve().parents[2]
 wd_dmdgp = os.path.join(wd, "dmdgp_HA9H")
-fn_solver = os.path.join(wd, "solvers", "sbbu.exe")
+fn_solver = os.path.join(wd, "solvers", "sbbu", "sbbu.exe")
 
 
 def run_sbbu(fn_dmdgp, fbs_active, dfs_all=0, dtol=1e-7):

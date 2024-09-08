@@ -4,9 +4,8 @@ import pandas as pd
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
-wd_dfs_results = "results/dfs"
-wd_fbs_results = "results/fbs"
-wd_speedups = "results/speed_ups"
+wd_dmdgp_HA9H = "dmdgp_HA9H"
+wd_speedups = "speedups"
 os.makedirs(wd_speedups, exist_ok=True)
 
 
@@ -18,15 +17,15 @@ def calculate_speed_up(row: pd.Series, col1_name: str, col2_name: str):
         return 1.0
     
     if (b == 0.0):
-        return np.inf
+        b = 1e-7
     
     return a / b
 
 
 def process_file(fn: str):
     # Read the CSV files
-    df_dfs = pd.read_csv(os.path.join(wd_dfs_results, fn))
-    df_fbs = pd.read_csv(os.path.join(wd_fbs_results, fn))
+    df_dfs = pd.read_csv(os.path.join(wd_dmdgp_HA9H, fn + '_dfs.tmr'))
+    df_fbs = pd.read_csv(os.path.join(wd_dmdgp_HA9H, fn + '_fbs.tmr'))
 
     # Rename columns
     df_dfs = df_dfs.rename(columns={'edge_time': 'edge_time_dfs', 'edge_niters': 'edge_niters_dfs'})
@@ -35,7 +34,7 @@ def process_file(fn: str):
     # Concatenate DataFrames
     df_speedups = pd.concat([
         df_dfs[['i', 'j', 'code', 'edge_time_dfs', 'edge_niters_dfs']],
-        df_fbs[['edge_time_fbs', 'edge_niters_fbs', 'is_independent']]
+        df_fbs[['edge_time_fbs', 'edge_niters_fbs']]
     ], axis=1)
 
     # Calculate speedups
@@ -48,15 +47,16 @@ def process_file(fn: str):
 
 def main():
     
-    fnames_dfs = os.listdir(wd_dfs_results)
-    fnames_dfs = set(fn for fn in fnames_dfs if fn.endswith('.csv'))
-    fnames_fbs = os.listdir(wd_fbs_results)
-    fnames_fbs = set(fn for fn in fnames_fbs if fn.endswith('.csv'))
+    fnames_dfs = os.listdir(wd_dmdgp_HA9H)
+    fnames_dfs = set(fn.replace('_dfs.tmr', '') for fn in fnames_dfs if fn.endswith('_dfs.tmr'))
+    fnames_fbs = os.listdir(wd_dmdgp_HA9H)
+    fnames_fbs = set(fn.replace('_fbs.tmr', '') for fn in fnames_fbs if fn.endswith('_fbs.tmr'))
 
     # getting the intersection of dfs and fbs solved problems
     common_fnames = list(fnames_dfs & fnames_fbs)
-    fnames_just_in_dfs = fnames_dfs - fnames_fbs
-    fnames_just_in_fbs = fnames_fbs - fnames_dfs
+    
+    # for fn in tqdm(common_fnames):
+    #     process_file(fn)
     
     # Using ProcessPoolExecutor to parallelize the processing of files
     with ProcessPoolExecutor() as executor:
