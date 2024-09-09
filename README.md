@@ -27,7 +27,7 @@ To reproduce de experiments, the researcher must run the following scripts in th
 
 4. run create_dmdgp_HA9H.py;
 
-5. run run_dfs.py;
+5. run solvers/sbbu/run_dfs.py;
 
 6. run create_dmdgp_HA9H_bsol.py;
 
@@ -36,11 +36,11 @@ To reproduce de experiments, the researcher must run the following scripts in th
 8. in the sbbu_t constructor (script 'sbbu.h'), change the argument of the function 'read_fbs' to 
 the absolute path of the file 'df_train.py' (it was generated after running the step 7.).
 
-9. run run_fbs.py;
+9. run solvers/sbbu/run_fbs.py;
 
-Now, to generate tthe graphics, the researcher has to:
+Now, to generate the graphics, the researcher has to:
 
 10. run create_speedups.py;
 
-11. run all the cells from the python notebook 'analysis_dmdgp_HA9H.ipynb'.
+11. run all the cells from the python notebook analysis_dmdgp_HA9H.ipynb.
 

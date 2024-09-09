@@ -42,7 +42,7 @@ def process_file(fn: str):
     df_speedups['speed_up_niters'] = df_speedups.apply(lambda row: calculate_speed_up(row, 'edge_niters_dfs', 'edge_niters_fbs'), axis=1)
 
     # Save the result to a CSV file
-    df_speedups.to_csv(os.path.join(wd_speedups, fn), index=False)
+    df_speedups.to_csv(os.path.join(wd_speedups, fn + '.csv'), index=False)
 
 
 def main():

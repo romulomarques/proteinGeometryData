@@ -8,7 +8,7 @@ wd_dmdgp = os.path.join(wd, "dmdgp_HA9H")
 fn_solver = os.path.join(wd, "solvers", "sbbu", "sbbu.exe")
 
 
-def run_sbbu(fn_dmdgp, fbs_active, dfs_all=0, dtol=1e-7):
+def run_sbbu(fn_dmdgp, fbs_active, dfs_all=0, dtol=1e-8):
     # Check if the sbbu.exe exists
     if not os.path.isfile(fn_solver):
         raise FileNotFoundError(f"Error: {fn_solver} does not exist.")
