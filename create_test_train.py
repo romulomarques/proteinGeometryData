@@ -58,16 +58,22 @@ def get_repetition_indexes(fn_dmdgp):
 def normalize_bsol(bsol: str) -> str:
     if bsol[0] == "1":
         return "0" + bsol[1:]
-    else:
-        return bsol
+    return bsol
 
 
 def count_bsol(fname: str) -> pd.DataFrame:
     df_bsol = pd.read_csv(fname, dtype={"bsol": str})
-
     df_freq = df_bsol.groupby(["code", "bsol"]).size().reset_index(name="count")
-
     return df_freq
+
+
+def convert_bsol_to_mirror(bsol: str) -> str:
+    # convert from str to binary
+    bsol = np.array([int(x) for x in bsol])
+    for i in range(len(bsol)):
+        if bsol[i]:
+            bsol[i + 1 :] = 1 - bsol[i + 1 :]
+    return "".join([str(int(x)) for x in bsol])
 
 
 def concatenate_bsol_data(fnames: list) -> pd.DataFrame:
@@ -119,10 +125,10 @@ def save_train_test(df_train: pd.DataFrame, test_files: list):
             f.write(fn_txt + "\n")
 
     # saving the dataframe results of the training files
-    fn_csv = "df_train.csv"
+    fn_csv = "df_train_mf.csv"
     print(f"Saving the training data in {fn_csv}")
     df_train.to_csv(fn_csv, index=False)
-    save_pkl("df_train", df_train)
+    save_pkl("df_train_mf", df_train)
 
 
 if __name__ == "__main__":
@@ -138,7 +144,8 @@ if __name__ == "__main__":
     df_train = concatenate_bsol_data(train_files)
 
     # combining the symmetric bsol values
-    df_train["bsol"] = df_train["bsol"].apply(lambda x: normalize_bsol(x))
+    df_train["bsol"] = df_train["bsol"].apply(convert_bsol_to_mirror)
+    df_train["bsol"] = df_train["bsol"].apply(normalize_bsol)
 
     df_train = (
         df_train.groupby(["bsol"])
