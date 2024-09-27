@@ -601,6 +601,7 @@ public:
       {
          const bool* f = &m_fbs_code[ k ];
          cr.reflect( f, m_n, xj ); // updates x
+         ++niters;
          
          eij = fabs( vec3_dist( xi, xj ) - edge.m_l );
 
@@ -613,7 +614,6 @@ public:
                m_fopt[ i ] = f[ i ];
             break;
          }
-         ++niters;
       }
 
       vec3_copy( xj, cr.m_y );
@@ -776,7 +776,7 @@ public:
 
       sort_edges_by_order( m_edges, m_nedges );
 
-      // sort_edges_default( );
+      // sort_edges_default( m_edges, m_nedges );
 
       double tic = omp_get_wtime();
       for ( int k = 0; k < m_nedges; ++k )

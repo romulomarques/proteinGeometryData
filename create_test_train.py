@@ -95,9 +95,7 @@ def concatenate_bsol_data(fnames: list) -> pd.DataFrame:
         .reset_index()
     )
 
-    df_dmdgp_HA9H_bsol["total"] = df_dmdgp_HA9H_bsol.groupby("code")["count"].transform(
-        "sum"
-    )
+    df_dmdgp_HA9H_bsol["total"] = df_dmdgp_HA9H_bsol.groupby("code")["count"].transform("sum")
 
     print("Calculating the relative frequencies of each pair (edge_type, bsol)...")
     df_dmdgp_HA9H_bsol["relfreq"] = (
