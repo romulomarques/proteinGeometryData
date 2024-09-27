@@ -4,6 +4,24 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Build JCIM_2024.tex",
+            "type": "shell",
+            "command": "pdflatex",
+            "args": [
+                "-interaction=batchmode",
+                "JCIM_2024.tex"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/JCIM_2024"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "detail": "Compile JCIM_2024.tex using LaTeX in silent mode, ignoring errors"
+        },
+        {
             "label": "build bp.exe",
             "type": "shell",
             "command": "make",
