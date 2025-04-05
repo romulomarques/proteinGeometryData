@@ -13,13 +13,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
+from create_prune_edges import read_xbsol
 
 wd_xbsol = "xbsol"
-wd_prune = "prune_bsol"
+wd_prune = "prune_edges"
 wd_dmdgp = "dmdgp"
 
 
-def read_prune(fn_prune: str) -> pd.DataFrame:
+def read_prune_edges(fn_prune: str) -> pd.DataFrame:
     """Reads a prune_bsol CSV file.
 
     Args:
@@ -29,20 +30,6 @@ def read_prune(fn_prune: str) -> pd.DataFrame:
         A pandas DataFrame containing the prune_bsol data.
     """
     return pd.read_csv(fn_prune, dtype={"bsol": "str"})
-
-
-def read_xbsol(fn_xbsol: str) -> pd.DataFrame:
-    """Reads an xbsol CSV file.
-
-    Args:
-        fn_xbsol: A string path to the xbsol CSV file.
-
-    Returns:
-        A pandas DataFrame containing the xbsol data with 'x' column parsed as numpy arrays.
-    """
-    return pd.read_csv(
-        fn_xbsol, converters={"x": lambda x: np.fromstring(x[1:-1], sep=" ")}
-    )
 
 
 def create_discretization_edges(df_xbsol: pd.DataFrame, n_bins: int) -> pd.DataFrame:
@@ -91,7 +78,8 @@ def create_dmdgp(fn_prune: str) -> None:
     Returns:
         None
     """
-    df_prune = read_prune(fn_prune)
+    df_prune = read_prune_edges(fn_prune)
+    
     fn_xbsol = fn_prune.replace(wd_prune, wd_xbsol)
     df_xbsol = read_xbsol(fn_xbsol)
 
@@ -106,7 +94,18 @@ def create_dmdgp(fn_prune: str) -> None:
     df_dmdgp.to_csv(fn_dmdgp.replace(".pkl", ".csv"), index=False)
 
 
-def main():
+def test_create_dmdgp():
+    # Create output directory if it doesn't exist
+    os.makedirs(wd_dmdgp, exist_ok=True)
+
+    fn_prune = "prune_edges/1a23_model1_chainA_segment2.csv"    
+    create_dmdgp(fn_prune)
+    exit()
+
+
+if __name__ == "__main__":
+    # test_create_dmdgp()
+
     # Create output directory if it doesn't exist
     os.makedirs(wd_dmdgp, exist_ok=True)
 
@@ -124,16 +123,3 @@ def main():
                 desc="Processing files",
             )
         )
-
-
-def test_create_dmdgp():
-    # Create output directory if it doesn't exist
-    os.makedirs(wd_dmdgp, exist_ok=True)
-
-    fn_prune = "1a23_model1_chainA_segment2.csv"
-    create_dmdgp(os.path.join(wd_prune, fn_prune))
-
-
-if __name__ == "__main__":
-    main()
-    # test_create_dmdgp()

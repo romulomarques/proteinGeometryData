@@ -4,15 +4,93 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build debug",
+            "label": "Build JCIM_2024.tex",
             "type": "shell",
-            "command": "make debug",
+            "command": "pdflatex",
+            "args": [
+                "-interaction=batchmode",
+                "JCIM_2024.tex"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/JCIM_2024"
+            },
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": false
             },
-            "problemMatcher": ["$gcc"],
-            "detail": "Build the project with debug flags"
-        }        
+            "problemMatcher": [],
+            "detail": "Compile JCIM_2024.tex using LaTeX in silent mode, ignoring errors"
+        },
+        {
+            "label": "build bp.exe",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "bp.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/solvers/bp"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver bp.exe with debug flags"
+        },
+        {
+            "label": "build sbbu.exe",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "sbbu.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/solvers/sbbu"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver sbbu.exe with debug flags"
+        },
+        {
+            "label": "build sbbu_dbg.exe",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "sbbu_dbg.exe"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/solvers/sbbu"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build the solver sbbu.exe with debug flags"
+        },
+        {
+            "label": "Black it!",
+            "type": "shell",
+            "command": "black",
+            "args": [
+                "${file}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "detail": "Format the current Python file with black"
+        }
     ]
 }

@@ -26,6 +26,64 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "(gdb) sbbu_dbg.exe",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/solvers/sbbu/sbbu_dbg.exe",
+            "args": [
+                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1a1u_model1_chainA_segment1.csv",
+                "-tmax", "3600",
+                "-dtol", "1e-7",
+                "-fbs", "0",
+                "-dfs_all", "0",
+                "-verbose", "1",
+            ],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build sbbu_dbg.exe",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "(gdb) sbbu.exe",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/solvers/sbbu/sbbu.exe",
+            "args": [
+                "-nmr", "${workspaceFolder}/dmdgp_HA9H/1a1u_model1_chainA_segment1.csv",
+                "-tmax", "3600",
+                "-dtol", "1e-7",
+                "-fbs", "0",
+                "-dfs_all", "0",
+                "-verbose", "1",
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build sbbu.exe",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "internalConsoleOptions": "openOnSessionStart"
         }
     ]
 }
